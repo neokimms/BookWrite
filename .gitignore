@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+.codex/
 node_modules/
 __pycache__/
 *.pyc

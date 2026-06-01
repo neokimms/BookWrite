@@ -1,12 +1,17 @@
 const ideaForm = document.querySelector("#ideaForm");
 const obsidianForm = document.querySelector("#obsidianForm");
+const workspaceTabs = document.querySelectorAll("[data-view-tab]");
+const workspaceViews = document.querySelectorAll("[data-view-panel]");
 const projectSelect = document.querySelector("#projectSelect");
 const projectNameInput = document.querySelector("#projectName");
 const bookTitleInput = document.querySelector("#bookTitle");
 const exportTemplateInput = document.querySelector("#exportTemplate");
 const createProjectButton = document.querySelector("#createProjectButton");
 const saveProjectButton = document.querySelector("#saveProjectButton");
+const openWritingButton = document.querySelector("#openWritingButton");
 const projectState = document.querySelector("#projectState");
+const projectListCount = document.querySelector("#projectListCount");
+const projectCards = document.querySelector("#projectCards");
 const weekStartInput = document.querySelector("#weekStart");
 const weekEndInput = document.querySelector("#weekEnd");
 const thisWeekButton = document.querySelector("#thisWeekButton");
@@ -219,6 +224,19 @@ function updateInputMeters() {
   setMeterState(detailMeter, detailCount, 250, 600);
 }
 
+function showView(viewName) {
+  for (const tab of workspaceTabs) {
+    const isActive = tab.dataset.viewTab === viewName;
+    tab.classList.toggle("is-active", isActive);
+    tab.setAttribute("aria-selected", String(isActive));
+  }
+  for (const view of workspaceViews) {
+    const isActive = view.dataset.viewPanel === viewName;
+    view.classList.toggle("is-active", isActive);
+    view.hidden = !isActive;
+  }
+}
+
 function readStoredJson(key, fallback) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
@@ -316,6 +334,47 @@ function setProjectState(message) {
   projectState.textContent = message;
 }
 
+function formatProjectDate(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.valueOf()) ? date.toLocaleDateString() : "날짜 없음";
+}
+
+function projectCardHtml(project) {
+  const isActive = project.id === activeProjectId;
+  const outlineCountText = `${Array.isArray(project.outline) ? project.outline.length : 0}개 챕터`;
+  const title = project.bookTitle || project.form?.bookTitle || "책 제목 미정";
+  const updatedAt = formatProjectDate(project.updatedAt);
+  return `
+    <article class="project-card${isActive ? " is-active" : ""}" data-project-id="${escapeHtml(project.id)}">
+      <div class="project-card-main">
+        <div>
+          <span class="project-badge">${isActive ? "선택됨" : "프로젝트"}</span>
+          <h3>${escapeHtml(project.name || defaults.projectName)}</h3>
+        </div>
+        <button type="button" class="secondary-button compact-button" data-project-action="open" data-project-id="${escapeHtml(project.id)}">열기</button>
+      </div>
+      <p>${escapeHtml(title)}</p>
+      <div class="project-card-meta">
+        <span>${escapeHtml(outlineCountText)}</span>
+        <span>${escapeHtml(updatedAt)}</span>
+      </div>
+    </article>
+  `;
+}
+
+function renderProjectCards(projects = loadProjects()) {
+  projectListCount.textContent = `${projects.length}개`;
+  if (!projects.length) {
+    projectCards.innerHTML = `
+      <div class="empty-state">
+        <strong>프로젝트가 없습니다.</strong>
+      </div>
+    `;
+    return;
+  }
+  projectCards.innerHTML = projects.map(projectCardHtml).join("");
+}
+
 function renderProjects(projects = loadProjects()) {
   const currentProject = activeProject(projects);
   activeProjectId = currentProject.id;
@@ -326,6 +385,7 @@ function renderProjects(projects = loadProjects()) {
   projectNameInput.value = currentProject.name || defaults.projectName;
   bookTitleInput.value = currentProject.bookTitle || currentProject.form?.bookTitle || "";
   setProjectState(`${projects.length}개 프로젝트`);
+  renderProjectCards(projects);
 }
 
 function saveActiveProject(options = {}) {
@@ -466,6 +526,25 @@ function switchProject(projectId) {
   writeLog(`책 프로젝트를 전환했습니다: ${nextProject.name}`);
 }
 
+function openWritingView() {
+  persistForm();
+  showView("writing");
+}
+
+function handleProjectCardAction(event) {
+  const button = event.target.closest("[data-project-action]");
+  if (!button) {
+    return;
+  }
+  const projectId = button.dataset.projectId || "";
+  if (button.dataset.projectAction === "open") {
+    if (projectId !== activeProjectId) {
+      switchProject(projectId);
+    }
+    showView("writing");
+  }
+}
+
 function loadBookOutline() {
   try {
     const raw =
@@ -481,6 +560,7 @@ function loadBookOutline() {
 function saveBookOutline(outline) {
   localStorage.setItem(scopedStorageKey(BOOK_OUTLINE_STORAGE_KEY), JSON.stringify(outline));
   saveActiveProject({ silent: true });
+  renderProjectCards(loadProjects());
 }
 
 function currentChapterOutlineItem() {
@@ -1833,6 +1913,11 @@ exportPdfButton.addEventListener("click", () => exportManuscript("pdf"));
 projectSelect.addEventListener("change", () => switchProject(projectSelect.value));
 createProjectButton.addEventListener("click", createProject);
 saveProjectButton.addEventListener("click", () => saveActiveProject());
+openWritingButton.addEventListener("click", openWritingView);
+projectCards.addEventListener("click", handleProjectCardAction);
+for (const tab of workspaceTabs) {
+  tab.addEventListener("click", () => showView(tab.dataset.viewTab || "projects"));
+}
 addCurrentChapterButton.addEventListener("click", addCurrentChapterToOutline);
 exportOutlineButton.addEventListener("click", exportBookOutline);
 outlineList.addEventListener("click", handleOutlineAction);

@@ -125,11 +125,43 @@ h3 {
   box-shadow: var(--shadow);
 }
 
+.workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.workspace-tab {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.workspace-tab.is-active {
+  border-color: rgba(11, 111, 104, 0.36);
+  background: #eef7f4;
+  color: var(--accent-strong);
+}
+
+.workspace-view {
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-view[hidden] {
+  display: none;
+}
+
 .workflow-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .workflow-step {
@@ -168,35 +200,120 @@ h3 {
 }
 
 .brief-panel {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   padding: 16px;
 }
 
 .project-panel {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   padding: 16px;
+}
+
+.project-dashboard {
+  display: grid;
+  grid-template-columns: minmax(420px, 0.95fr) minmax(420px, 1.05fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.project-dashboard .project-panel {
+  margin-bottom: 0;
 }
 
 .project-grid {
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(160px, 0.9fr) repeat(2, minmax(180px, 1fr)) minmax(140px, 0.72fr) minmax(200px, 0.9fr);
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
   gap: 12px;
   align-items: end;
 }
 
 .project-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
+.project-list-panel {
+  padding: 16px;
+}
+
+.project-cards {
+  display: grid;
+  gap: 10px;
+}
+
+.project-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.project-card.is-active {
+  border-color: rgba(11, 111, 104, 0.42);
+  background: #eef7f4;
+}
+
+.project-card-main {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-card h3 {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+.project-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.project-badge {
+  display: inline-grid;
+  border-radius: 999px;
+  background: #e9edf4;
+  color: var(--blue);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.project-card.is-active .project-badge {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.project-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-card-meta span {
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--muted);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .outline-panel {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   padding: 16px;
 }
 
 .style-guide-panel {
-  margin-bottom: 14px;
+  margin-bottom: 0;
   padding: 16px;
 }
 
@@ -601,7 +718,7 @@ select:focus {
 }
 
 details {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 summary {
@@ -681,7 +798,7 @@ summary {
 
 .run-panel,
 .settings-panel {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 #draftPreview {
@@ -705,7 +822,7 @@ summary {
 }
 
 .version-panel {
-  margin-top: 12px;
+  margin-top: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
@@ -969,6 +1086,7 @@ summary {
 
 @media (max-width: 1080px) {
   .studio-main,
+  .project-dashboard,
   .project-grid,
   .brief-grid,
   .compact-grid.wide,
@@ -997,9 +1115,11 @@ summary {
   }
 
   .workflow-strip,
+  .workspace-tabs,
   .brief-grid,
   .style-guide-grid,
   .compact-grid,
+  .project-actions,
   .outline-actions,
   .outline-item,
   .outline-item-actions,
