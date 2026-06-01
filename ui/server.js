@@ -261,6 +261,50 @@ function resolveObsidianVault(rawVault) {
   return connection.defaultVaultPath;
 }
 
+function checkObsidianSettings(payload = {}) {
+  const connection = detectObsidianConnection();
+  const rawVault = String(payload.vault || "").trim();
+  let vaultPath = "";
+  let vaultExists = false;
+  let vaultHasConfig = false;
+  let importFolder = "";
+  let importFolderExists = false;
+  let savePreview = "";
+
+  try {
+    vaultPath = rawVault ? (path.isAbsolute(rawVault) ? rawVault : path.resolve(ROOT, rawVault)) : connection.defaultVaultPath;
+    vaultExists = Boolean(vaultPath && fs.existsSync(vaultPath) && fs.statSync(vaultPath).isDirectory());
+    vaultHasConfig = Boolean(vaultExists && fs.existsSync(path.join(vaultPath, ".obsidian")));
+    if (vaultExists) {
+      const folder = String(payload.folder || "").trim();
+      importFolder = folder ? path.join(vaultPath, folder) : vaultPath;
+      importFolderExists = fs.existsSync(importFolder) && fs.statSync(importFolder).isDirectory();
+      const chapterFolder = String(payload.chapterFolder || "Book Drafts").trim();
+      const title = String(payload.chapterTitle || "챕터 제목").trim();
+      savePreview = path.join(projectOutputDir(vaultPath, chapterFolder, payload), `${safeFileName(title)}.md`);
+    }
+  } catch {
+    vaultExists = false;
+  }
+
+  const connected = Boolean(vaultExists && vaultHasConfig);
+  const message = connected
+    ? "Obsidian vault 연결을 확인했습니다."
+    : "Obsidian vault 경로나 .obsidian 설정 폴더를 확인해 주세요.";
+
+  return {
+    obsidianConnection: connection,
+    connected,
+    vaultPath,
+    vaultExists,
+    vaultHasConfig,
+    importFolder,
+    importFolderExists,
+    savePreview,
+    message,
+  };
+}
+
 function writeRunState(payload) {
   const state = {
     action: payload.action || "unknown",
@@ -595,6 +639,28 @@ function draftTypeInfo(type) {
   return infos[type] || infos.case;
 }
 
+function chapterTemplateInfo(template) {
+  const templates = {
+    scene: {
+      label: "장면에서 시작",
+      direction: "첫 문단은 사용자가 겪은 장면, 대화, 상황 묘사에서 시작한다.",
+    },
+    problem: {
+      label: "문제-해결",
+      direction: "문제 정의, 원인, 전환점, 적용 가능한 해결 기준 순서로 전개한다.",
+    },
+    lesson: {
+      label: "교훈/통찰",
+      direction: "경험에서 얻은 판단 기준과 독자가 가져갈 질문을 중심으로 전개한다.",
+    },
+    howto: {
+      label: "실행 가이드",
+      direction: "독자가 따라 할 수 있는 단계, 체크포인트, 적용 예시 중심으로 전개한다.",
+    },
+  };
+  return templates[String(template || "").trim()] || templates.scene;
+}
+
 function styleGuideInfo(payload) {
   const guide = payload?.styleGuide || {};
   return {
@@ -623,11 +689,23 @@ function styleGuidePromptLines(payload) {
   return lines;
 }
 
+function entriesForPayload(payload = {}) {
+  const entries = entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId);
+  const included = Array.isArray(payload.includedEntryIds)
+    ? new Set(payload.includedEntryIds.map((id) => String(id)))
+    : null;
+  if (!included || included.size === 0) {
+    return entries;
+  }
+  return entries.filter((entry) => included.has(entry.id));
+}
+
 function buildChapterMarkdown(entries, payload) {
   const weekStart = payload.weekStart || "시작일";
   const weekEnd = payload.weekEnd || "종료일";
   const title = markdownLine(payload.chapterTitle) || `${weekStart} - ${weekEnd} 원고 초안`;
   const draftType = draftTypeInfo(payload.draftType);
+  const chapterTemplate = chapterTemplateInfo(payload.chapterTemplate);
   const bookContext = markdownLine(payload.bookContext);
   const targetReader = markdownLine(payload.targetReader);
   const chapterGoal = markdownLine(payload.chapterGoal);
@@ -641,6 +719,7 @@ function buildChapterMarkdown(entries, payload) {
     `project_name: ${yamlString(payload.projectName || "")}`,
     `book_title: ${yamlString(payload.bookTitle || "")}`,
     `draft_type: ${payload.draftType || "case"}`,
+    `chapter_template: ${yamlString(chapterTemplate.label)}`,
     `week_start: ${weekStart}`,
     `week_end: ${weekEnd}`,
     "status: draft",
@@ -656,6 +735,8 @@ function buildChapterMarkdown(entries, payload) {
     `- 책의 맥락: ${bookContext || "미정"}`,
     `- 원고 유형: ${draftType.label}`,
     `- 유형 방향: ${draftType.focus}`,
+    `- 챕터 템플릿: ${chapterTemplate.label}`,
+    `- 템플릿 방향: ${chapterTemplate.direction}`,
     `- 예상 독자: ${targetReader || "미정"}`,
     `- 이번 원고의 목표: ${chapterGoal || "미정"}`,
     `- 원하는 톤: ${tone || "미정"}`,
@@ -703,6 +784,7 @@ function buildChapterMarkdown(entries, payload) {
     `## ${draftType.sections[3]}`,
     "",
     "날짜순 재료를 그대로 나열하지 말고, 하나의 챕터 또는 사례 원고로 자연스럽게 엮습니다.",
+    `템플릿 방향: ${chapterTemplate.direction}`,
     "",
     `## ${draftType.sections[4]}`,
     "",
@@ -763,6 +845,7 @@ function frontmatterBlock(markdown) {
 function draftFrontmatter(payload) {
   const weekStart = String(payload.weekStart || "").slice(0, 10) || "시작일";
   const weekEnd = String(payload.weekEnd || "").slice(0, 10) || "종료일";
+  const chapterTemplate = chapterTemplateInfo(payload.chapterTemplate);
   return [
     "---",
     "book_draft: true",
@@ -770,6 +853,7 @@ function draftFrontmatter(payload) {
     `project_name: ${yamlString(payload.projectName || "")}`,
     `book_title: ${yamlString(payload.bookTitle || "")}`,
     `draft_type: ${payload.draftType || "case"}`,
+    `chapter_template: ${yamlString(chapterTemplate.label)}`,
     `week_start: ${weekStart}`,
     `week_end: ${weekEnd}`,
     "status: edited",
@@ -877,6 +961,60 @@ function markdownToHtml(markdown) {
   return html.join("\n");
 }
 
+function exportOptions(payload = {}) {
+  const options = payload.exportOptions && typeof payload.exportOptions === "object" ? payload.exportOptions : {};
+  return {
+    chapterNumber: markdownLine(options.chapterNumber || payload.chapterNumber),
+    includeCover: options.includeCover !== false,
+    includeToc: options.includeToc !== false,
+  };
+}
+
+function chapterDisplayTitle(title, options) {
+  const trimmed = String(title || "원고").trim();
+  if (!options.chapterNumber || /^제\s*\S+\s*장/.test(trimmed)) {
+    return trimmed;
+  }
+  return `제 ${options.chapterNumber}장. ${trimmed}`;
+}
+
+function tableOfContentsFromMarkdown(markdown) {
+  return String(markdown || "")
+    .split(/\r?\n/)
+    .map((line) => line.match(/^##\s+(.+)$/))
+    .filter(Boolean)
+    .map((match) => `- ${match[1].trim()}`);
+}
+
+function prepareManuscriptMarkdown(markdown, payload, title) {
+  const options = exportOptions(payload);
+  const body = String(markdown || "").trim();
+  const displayTitle = chapterDisplayTitle(title, options);
+  const normalizedBody = body.replace(/^#\s+(.+)$/m, `# ${displayTitle}`);
+  const lines = [];
+
+  if (options.includeCover) {
+    lines.push(
+      `# ${payload.bookTitle || payload.projectName || "책 원고"}`,
+      "",
+      `## ${displayTitle}`,
+      "",
+      `- 프로젝트: ${payload.projectName || "미정"}`,
+      `- 원고 유형: ${draftTypeInfo(payload.draftType).label}`,
+      `- 기간: ${payload.weekStart || "시작일"} - ${payload.weekEnd || "종료일"}`,
+      "",
+    );
+  }
+
+  const toc = tableOfContentsFromMarkdown(normalizedBody);
+  if (options.includeToc && toc.length) {
+    lines.push("## 목차", "", ...toc, "");
+  }
+
+  lines.push(normalizedBody);
+  return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;
+}
+
 function exportTemplateInfo(template) {
   const templates = {
     manuscript: {
@@ -889,6 +1027,7 @@ function exportTemplateInfo(template) {
         "h3 { font-size: 16px; margin: 24px 0 10px; }",
         "p, li { font-size: 13.5px; }",
         "ul { padding-left: 22px; }",
+        "body > h1:first-child { break-after: avoid; border-bottom: 1px solid #d8dfda; padding-bottom: 18px; }",
       ],
     },
     essay: {
@@ -901,6 +1040,7 @@ function exportTemplateInfo(template) {
         "h3 { font-size: 17px; margin: 28px 0 12px; }",
         "p, li { font-size: 14.5px; }",
         "ul { padding-left: 24px; }",
+        "body > h1:first-child { break-after: avoid; border-bottom: 1px solid #d6d0c4; padding-bottom: 20px; }",
       ],
     },
     compact: {
@@ -913,6 +1053,7 @@ function exportTemplateInfo(template) {
         "h3 { font-size: 15px; margin: 18px 0 8px; }",
         "p, li { font-size: 12.5px; }",
         "ul { padding-left: 20px; }",
+        "body > h1:first-child { border-bottom: 1px solid #d8dfda; padding-bottom: 12px; }",
       ],
     },
   };
@@ -1007,6 +1148,7 @@ async function expandChapterWithLlm(markdown, entries, payload) {
   }
 
   const draftType = draftTypeInfo(payload.draftType);
+  const chapterTemplate = chapterTemplateInfo(payload.chapterTemplate);
   const styleLines = styleGuidePromptLines(payload);
   const systemPrompt = [
     "당신은 사용자의 아이디어를 책 원고로 확장하는 한국어 작가 에이전트입니다.",
@@ -1022,6 +1164,7 @@ async function expandChapterWithLlm(markdown, entries, payload) {
     "요구사항:",
     "- YAML frontmatter를 유지하세요.",
     `- 원고 유형은 "${draftType.label}"입니다. ${draftType.focus}`,
+    `- 챕터 템플릿은 "${chapterTemplate.label}"입니다. ${chapterTemplate.direction}`,
     "- 선택된 원고 유형에 맞게 제목, 도입부, 전개, 원고 본문, 독자에게 남길 해석, 마무리를 실제 문장으로 채우세요.",
     "- 날짜순 원고 재료는 오래된 날짜부터 최신 날짜까지 유지하세요.",
     "- 입력 재료가 적으면 억지로 사실을 만들지 말고, 사용자가 준 상황을 바탕으로 일반화된 설명을 쓰세요.",
@@ -1034,6 +1177,8 @@ async function expandChapterWithLlm(markdown, entries, payload) {
     `이번 원고 목표: ${payload.chapterGoal || "미정"}`,
     `원고 유형: ${draftType.label}`,
     `유형 방향: ${draftType.focus}`,
+    `챕터 템플릿: ${chapterTemplate.label}`,
+    `템플릿 방향: ${chapterTemplate.direction}`,
     `톤: ${payload.tone || "미정"}`,
     ...(styleLines.length ? ["작가 스타일 가이드:", ...styleLines] : []),
     `원고 재료 수: ${entries.length}`,
@@ -1088,7 +1233,7 @@ async function exportChapterToObsidian(payload) {
 
   const weekStart = String(payload.weekStart || "").slice(0, 10);
   const weekEnd = String(payload.weekEnd || "").slice(0, 10);
-  const entries = entriesForRange(weekStart, weekEnd, payload.projectId);
+  const entries = entriesForPayload({ ...payload, weekStart, weekEnd });
   const folder = String(payload.chapterFolder || "Book Drafts").trim();
   const outputDir = projectOutputDir(vault, folder, payload);
   fs.mkdirSync(outputDir, { recursive: true });
@@ -1450,13 +1595,14 @@ async function exportManuscriptFile(payload) {
     throw new Error("지원하지 않는 내보내기 형식입니다.");
   }
 
-  const markdown = markdownWithoutFrontmatter(payload.markdown) || String(payload.markdown || "").trim();
-  if (!markdown) {
+  const sourceMarkdown = markdownWithoutFrontmatter(payload.markdown) || String(payload.markdown || "").trim();
+  if (!sourceMarkdown) {
     throw new Error("내보낼 원고 초안을 먼저 작성하거나 생성해 주세요.");
   }
 
-  const title = String(payload.chapterTitle || titleFromMarkdown(markdown) || "book-manuscript").trim();
+  const title = String(payload.chapterTitle || titleFromMarkdown(sourceMarkdown) || "book-manuscript").trim();
   const template = exportTemplateInfo(payload.exportTemplate);
+  const markdown = prepareManuscriptMarkdown(sourceMarkdown, payload, title);
   const exportDir = path.join(ROOT, "output", "exports");
   fs.mkdirSync(exportDir, { recursive: true });
   const baseName = `${localTimestampForFile()}_${safeFileName(title)}`;
@@ -1495,7 +1641,7 @@ async function exportManuscriptFile(payload) {
 async function generateChapterDraft(payload) {
   const weekStart = String(payload.weekStart || "").slice(0, 10);
   const weekEnd = String(payload.weekEnd || "").slice(0, 10);
-  const entries = entriesForRange(weekStart, weekEnd, payload.projectId);
+  const entries = entriesForPayload({ ...payload, weekStart, weekEnd });
   const draftMarkdown = buildChapterMarkdown(entries, payload);
   const expanded = await expandChapterWithLlm(draftMarkdown, entries, payload);
   const lastRun = writeRunState({
@@ -1574,8 +1720,9 @@ async function reviewDraftQuality(payload) {
 
   const weekStart = String(payload.weekStart || "").slice(0, 10);
   const weekEnd = String(payload.weekEnd || "").slice(0, 10);
-  const entries = entriesForRange(weekStart, weekEnd, payload.projectId);
+  const entries = entriesForPayload({ ...payload, weekStart, weekEnd });
   const draftType = draftTypeInfo(payload.draftType);
+  const chapterTemplate = chapterTemplateInfo(payload.chapterTemplate);
   const styleLines = styleGuidePromptLines(payload);
 
   if (payload.reviewWithLlm === false || !LLM_API_KEY) {
@@ -1619,6 +1766,7 @@ async function reviewDraftQuality(payload) {
     "각 섹션은 짧은 bullet 2-4개로 작성하세요.",
     "보강 질문은 사용자가 다음에 입력하면 좋은 질문 3-5개로 작성하세요.",
     "선택된 원고 유형에 맞는 구조와 문체인지 함께 점검하세요.",
+    `챕터 템플릿 "${chapterTemplate.label}" 기준도 함께 점검하세요. ${chapterTemplate.direction}`,
     ...(styleLines.length ? ["작가 스타일 가이드를 잘 지키는지도 함께 점검하세요."] : []),
     "",
     `책의 맥락: ${payload.bookContext || "미정"}`,
@@ -1626,6 +1774,8 @@ async function reviewDraftQuality(payload) {
     `이번 원고 목표: ${payload.chapterGoal || "미정"}`,
     `원고 유형: ${draftType.label}`,
     `유형 방향: ${draftType.focus}`,
+    `챕터 템플릿: ${chapterTemplate.label}`,
+    `템플릿 방향: ${chapterTemplate.direction}`,
     `톤: ${payload.tone || "미정"}`,
     ...(styleLines.length ? ["작가 스타일 가이드:", ...styleLines] : []),
     `원고 재료 수: ${entries.length}`,
@@ -1735,7 +1885,7 @@ async function polishDraftForPublication(payload) {
       message: polishMessage,
     });
     return {
-      entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
+      entries: entriesForPayload(payload),
       markdown: polished,
       llmStatus: "polished",
       polishStatus: "rules",
@@ -1745,6 +1895,7 @@ async function polishDraftForPublication(payload) {
   }
 
   const draftType = draftTypeInfo(payload.draftType);
+  const chapterTemplate = chapterTemplateInfo(payload.chapterTemplate);
   const styleLines = styleGuidePromptLines(payload);
   const systemPrompt = [
     "당신은 책 출판 전 원고를 정리하는 한국어 편집자입니다.",
@@ -1762,6 +1913,7 @@ async function polishDraftForPublication(payload) {
     "- 본문은 선택된 원고 유형과 문체 기준에 맞게 자연스럽게 이어지도록 정리하세요.",
     "- 초안의 사실 관계를 새로 만들지 말고, 이미 있는 내용만 정돈하세요.",
     `- 원고 유형: ${draftType.label}. ${draftType.focus}`,
+    `- 챕터 템플릿: ${chapterTemplate.label}. ${chapterTemplate.direction}`,
     ...(styleLines.length ? ["- 작가 스타일 가이드:", ...styleLines] : []),
     "",
     "원고 초안:",
@@ -1807,7 +1959,7 @@ async function polishDraftForPublication(payload) {
   });
 
   return {
-    entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
+    entries: entriesForPayload(payload),
     markdown: `${polished.trim()}\n`,
     llmStatus: "polished",
     polishStatus: "ai",
@@ -2089,6 +2241,17 @@ async function handleApi(request, response) {
         ok: true,
         ...getStatus(projectId),
         entries: entriesForRange(weekStart, weekEnd, projectId),
+      });
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/check-obsidian") {
+      const payload = await readJson(request);
+      sendJson(response, 200, {
+        ok: true,
+        ...getStatus(payload.projectId),
+        ...checkObsidianSettings(payload),
+        entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
       });
       return;
     }

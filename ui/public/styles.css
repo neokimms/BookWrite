@@ -106,6 +106,16 @@ h3 {
   font-weight: 700;
 }
 
+#busyIndicator {
+  color: var(--accent-strong);
+}
+
+.is-busy #busyIndicator {
+  border-color: rgba(166, 99, 24, 0.28);
+  background: #fff5e8;
+  color: var(--amber);
+}
+
 .connection-note {
   align-self: end;
   border: 1px solid var(--line);
@@ -230,12 +240,19 @@ h3 {
 .project-actions {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
 .project-list-panel {
   padding: 16px;
+}
+
+.project-list-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .project-cards {
@@ -307,9 +324,60 @@ h3 {
   font-weight: 800;
 }
 
+.project-card-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(56px, 1fr));
+  gap: 6px;
+}
+
 .outline-panel {
   margin-bottom: 0;
   padding: 16px;
+}
+
+.preflight-panel {
+  padding: 16px;
+}
+
+.preflight-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preflight-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.preflight-item strong,
+.preflight-item span {
+  display: block;
+}
+
+.preflight-item strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.preflight-item span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.preflight-item.is-ok {
+  border-color: rgba(11, 111, 104, 0.34);
+  background: #eef7f4;
+}
+
+.preflight-item.is-warn {
+  border-color: rgba(166, 99, 24, 0.34);
+  background: #fff8ed;
 }
 
 .style-guide-panel {
@@ -429,6 +497,7 @@ h3 {
 .draft-panel,
 .output-panel,
 .import-panel,
+.llm-panel,
 .settings-panel,
 .run-panel {
   padding: 16px;
@@ -584,8 +653,17 @@ select:focus {
 
 .draft-actions {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 10px;
+  margin-bottom: 12px;
+}
+
+.export-options,
+.settings-grid {
+  display: grid;
+  grid-template-columns: 150px minmax(140px, 1fr) minmax(140px, 1fr);
+  gap: 10px;
+  align-items: end;
   margin-bottom: 12px;
 }
 
@@ -694,6 +772,12 @@ select:focus {
   margin-top: 10px;
 }
 
+.entry-include {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
 .muted-action {
   color: var(--muted);
   font-size: 12px;
@@ -751,7 +835,20 @@ summary {
 }
 
 .import-actions {
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 0.9fr 1fr 1fr 1fr;
+}
+
+.save-preview {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .saved-drafts-panel {
@@ -987,6 +1084,14 @@ summary {
   padding: 12px;
 }
 
+.export-preview {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
 .review-heading {
   margin-bottom: 10px;
 }
@@ -1091,6 +1196,9 @@ summary {
   .brief-grid,
   .compact-grid.wide,
   .import-grid,
+  .preflight-list,
+  .export-options,
+  .settings-grid,
   .run-grid {
     grid-template-columns: 1fr;
   }
@@ -1120,6 +1228,7 @@ summary {
   .style-guide-grid,
   .compact-grid,
   .project-actions,
+  .project-list-tools,
   .outline-actions,
   .outline-item,
   .outline-item-actions,

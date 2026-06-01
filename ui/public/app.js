@@ -8,10 +8,14 @@ const bookTitleInput = document.querySelector("#bookTitle");
 const exportTemplateInput = document.querySelector("#exportTemplate");
 const createProjectButton = document.querySelector("#createProjectButton");
 const saveProjectButton = document.querySelector("#saveProjectButton");
+const duplicateProjectButton = document.querySelector("#duplicateProjectButton");
+const deleteProjectButton = document.querySelector("#deleteProjectButton");
 const openWritingButton = document.querySelector("#openWritingButton");
 const projectState = document.querySelector("#projectState");
 const projectListCount = document.querySelector("#projectListCount");
 const projectCards = document.querySelector("#projectCards");
+const projectSearchInput = document.querySelector("#projectSearch");
+const projectSortInput = document.querySelector("#projectSort");
 const weekStartInput = document.querySelector("#weekStart");
 const weekEndInput = document.querySelector("#weekEnd");
 const thisWeekButton = document.querySelector("#thisWeekButton");
@@ -27,6 +31,7 @@ const tagsInput = document.querySelector("#tags");
 const chapterFolderInput = document.querySelector("#chapterFolder");
 const chapterTitleInput = document.querySelector("#chapterTitle");
 const draftTypeInput = document.querySelector("#draftType");
+const chapterTemplateInput = document.querySelector("#chapterTemplate");
 const llmModelInput = document.querySelector("#llmModel");
 const includeAllInput = document.querySelector("#includeAll");
 const expandWithLlmInput = document.querySelector("#expandWithLlm");
@@ -43,6 +48,15 @@ const promptPath = document.querySelector("#promptPath");
 const draftPreview = document.querySelector("#draftPreview");
 const draftState = document.querySelector("#draftState");
 const draftMeta = document.querySelector("#draftMeta");
+const preflightState = document.querySelector("#preflightState");
+const preflightChecklist = document.querySelector("#preflightChecklist");
+const chapterNumberInput = document.querySelector("#chapterNumber");
+const includeCoverInput = document.querySelector("#includeCover");
+const includeTocInput = document.querySelector("#includeToc");
+const previewExportButton = document.querySelector("#previewExportButton");
+const exportPreview = document.querySelector("#exportPreview");
+const exportPreviewState = document.querySelector("#exportPreviewState");
+const exportPreviewBody = document.querySelector("#exportPreviewBody");
 const savedDraftCount = document.querySelector("#savedDraftCount");
 const savedDraftList = document.querySelector("#savedDraftList");
 const reviewOutput = document.querySelector("#reviewOutput");
@@ -51,7 +65,11 @@ const manualCount = document.querySelector("#manualCount");
 const obsidianCount = document.querySelector("#obsidianCount");
 const obsidianConnectionStatus = document.querySelector("#obsidianConnectionStatus");
 const obsidianConnectionNote = document.querySelector("#obsidianConnectionNote");
+const obsidianSavePreview = document.querySelector("#obsidianSavePreview");
+const testObsidianButton = document.querySelector("#testObsidianButton");
 const llmConnectionStatus = document.querySelector("#llmConnectionStatus");
+const llmConnectionNote = document.querySelector("#llmConnectionNote");
+const busyIndicator = document.querySelector("#busyIndicator");
 const entryCount = document.querySelector("#entryCount");
 const entryList = document.querySelector("#entryList");
 const saveState = document.querySelector("#saveState");
@@ -72,6 +90,7 @@ const cancelEditButton = document.querySelector("#cancelEditButton");
 const loadWritingExample = document.querySelector("#loadWritingExample");
 const useExample = document.querySelector("#useExample");
 const loadSavedDraftsButton = document.querySelector("#loadSavedDraftsButton");
+const retryLastButton = document.querySelector("#retryLastButton");
 const titleMeter = document.querySelector("#titleMeter");
 const detailMeter = document.querySelector("#detailMeter");
 const outlineCount = document.querySelector("#outlineCount");
@@ -91,13 +110,18 @@ const STORAGE_KEY = "book-writing-agent-ui";
 const BOOK_PROJECTS_STORAGE_KEY = "book-writing-agent-projects";
 const DRAFT_VERSION_STORAGE_KEY = "book-writing-agent-draft-versions";
 const BOOK_OUTLINE_STORAGE_KEY = "book-writing-agent-book-outline";
+const ENTRY_INCLUSION_STORAGE_KEY = "book-writing-agent-entry-inclusion";
 const MAX_DRAFT_VERSIONS_PER_CHAPTER = 12;
 
 const defaults = {
   projectName: "내 책 프로젝트",
   bookTitle: "",
   draftType: "case",
+  chapterTemplate: "scene",
   exportTemplate: "manuscript",
+  includeCover: true,
+  includeToc: true,
+  chapterNumber: "",
   tags: "book-idea",
   bookContext:
     "사용자가 입력한 아이디어, 경험, 사례, 예시를 책에 넣을 수 있는 원고로 확장한다.",
@@ -135,6 +159,10 @@ let savedDrafts = [];
 let isBusyState = false;
 let activeProjectId = "default";
 let isApplyingProject = false;
+let projectSearchTerm = "";
+let projectSortMode = "updated-desc";
+let lastRetryAction = null;
+let statusErrorShown = false;
 
 const writingExample = {
   type: "case",
@@ -166,19 +194,28 @@ function setDefaultWeek() {
 function setBusy(isBusy) {
   isBusyState = isBusy;
   importButton.disabled = isBusy;
+  testObsidianButton.disabled = isBusy;
   buildButton.disabled = isBusy;
   polishDraftButton.disabled = isBusy;
   reviewDraftButton.disabled = isBusy;
   exportChapterButton.disabled = isBusy;
   exportDocxButton.disabled = isBusy;
   exportPdfButton.disabled = isBusy;
+  previewExportButton.disabled = isBusy;
   exportChapterPanelButton.disabled = isBusy;
   addIdeaButton.disabled = isBusy;
   cancelEditButton.disabled = isBusy;
+  createProjectButton.disabled = isBusy;
+  saveProjectButton.disabled = isBusy;
+  duplicateProjectButton.disabled = isBusy;
+  deleteProjectButton.disabled = isBusy;
+  openWritingButton.disabled = isBusy;
   addCurrentChapterButton.disabled = isBusy;
   exportOutlineButton.disabled = isBusy;
   loadObsidianVersionsButton.disabled = isBusy;
   loadSavedDraftsButton.disabled = isBusy;
+  retryLastButton.disabled = isBusy || !lastRetryAction;
+  busyIndicator.textContent = isBusy ? "작업 중" : "대기";
   document.body.classList.toggle("is-busy", isBusy);
   renderDraftVersions();
 }
@@ -274,9 +311,13 @@ function formSnapshot() {
     chapterFolder: chapterFolderInput.value.trim(),
     chapterTitle: chapterTitleInput.value.trim(),
     draftType: draftTypeInput.value,
+    chapterTemplate: chapterTemplateInput.value,
     llmModel: llmModelInput.value.trim(),
     expandWithLlm: expandWithLlmInput.checked,
     includeAll: includeAllInput.checked,
+    chapterNumber: chapterNumberInput.value.trim(),
+    includeCover: includeCoverInput.checked,
+    includeToc: includeTocInput.checked,
     bookContext: bookContextInput.value.trim(),
     targetReader: targetReaderInput.value.trim(),
     chapterGoal: chapterGoalInput.value.trim(),
@@ -351,7 +392,11 @@ function projectCardHtml(project) {
           <span class="project-badge">${isActive ? "선택됨" : "프로젝트"}</span>
           <h3>${escapeHtml(project.name || defaults.projectName)}</h3>
         </div>
-        <button type="button" class="secondary-button compact-button" data-project-action="open" data-project-id="${escapeHtml(project.id)}">열기</button>
+        <div class="project-card-actions">
+          <button type="button" class="secondary-button compact-button" data-project-action="open" data-project-id="${escapeHtml(project.id)}">열기</button>
+          <button type="button" class="ghost-button compact-button" data-project-action="duplicate" data-project-id="${escapeHtml(project.id)}">복제</button>
+          <button type="button" class="ghost-button compact-button danger-action" data-project-action="delete" data-project-id="${escapeHtml(project.id)}">삭제</button>
+        </div>
       </div>
       <p>${escapeHtml(title)}</p>
       <div class="project-card-meta">
@@ -362,17 +407,40 @@ function projectCardHtml(project) {
   `;
 }
 
+function visibleProjects(projects) {
+  const query = projectSearchTerm.trim().toLowerCase();
+  const filtered = query
+    ? projects.filter((project) =>
+        [project.name, project.bookTitle, project.form?.bookTitle]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query)),
+      )
+    : projects.slice();
+
+  return filtered.sort((a, b) => {
+    if (projectSortMode === "name-asc") {
+      return String(a.name || "").localeCompare(String(b.name || ""));
+    }
+    if (projectSortMode === "outline-desc") {
+      return (Array.isArray(b.outline) ? b.outline.length : 0) - (Array.isArray(a.outline) ? a.outline.length : 0);
+    }
+    return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
+  });
+}
+
 function renderProjectCards(projects = loadProjects()) {
-  projectListCount.textContent = `${projects.length}개`;
-  if (!projects.length) {
+  const cards = visibleProjects(projects);
+  projectListCount.textContent = cards.length === projects.length ? `${projects.length}개` : `${cards.length}/${projects.length}개`;
+  if (!cards.length) {
     projectCards.innerHTML = `
       <div class="empty-state">
-        <strong>프로젝트가 없습니다.</strong>
+        <strong>표시할 프로젝트가 없습니다.</strong>
+        <span>검색어를 줄이거나 새 프로젝트를 만들어 주세요.</span>
       </div>
     `;
     return;
   }
-  projectCards.innerHTML = projects.map(projectCardHtml).join("");
+  projectCards.innerHTML = cards.map(projectCardHtml).join("");
 }
 
 function renderProjects(projects = loadProjects()) {
@@ -428,10 +496,14 @@ function applyFormSnapshot(saved = {}) {
   chapterFolderInput.value = saved.chapterFolder || "Book Drafts";
   chapterTitleInput.value = saved.chapterTitle || "";
   draftTypeInput.value = saved.draftType || defaults.draftType;
+  chapterTemplateInput.value = saved.chapterTemplate || defaults.chapterTemplate;
   exportTemplateInput.value = saved.exportTemplate || defaults.exportTemplate;
   llmModelInput.value = saved.llmModel || "";
   includeAllInput.checked = Boolean(saved.includeAll);
   expandWithLlmInput.checked = saved.expandWithLlm !== false;
+  chapterNumberInput.value = saved.chapterNumber || defaults.chapterNumber;
+  includeCoverInput.checked = saved.includeCover !== false;
+  includeTocInput.checked = saved.includeToc !== false;
   bookContextInput.value = saved.bookContext || defaults.bookContext;
   targetReaderInput.value = saved.targetReader || defaults.targetReader;
   chapterGoalInput.value = saved.chapterGoal || defaults.chapterGoal;
@@ -468,6 +540,10 @@ function createProject() {
       bookTitle: typedName && !hasSameName ? bookTitleInput.value.trim() : "",
       chapterTitle: "",
       draftType: defaults.draftType,
+      chapterTemplate: defaults.chapterTemplate,
+      chapterNumber: "",
+      includeCover: defaults.includeCover,
+      includeToc: defaults.includeToc,
       bookContext: defaults.bookContext,
       targetReader: defaults.targetReader,
       chapterGoal: defaults.chapterGoal,
@@ -494,6 +570,93 @@ function createProject() {
   renderDraftVersions();
   loadStatus();
   writeLog("새 책 프로젝트를 만들었습니다.");
+}
+
+function duplicateProject(projectId = activeProjectId) {
+  saveActiveProject({ silent: true });
+  const projects = loadProjects();
+  const source = projects.find((project) => project.id === projectId);
+  if (!source) {
+    setProjectState("복제할 프로젝트 없음");
+    return;
+  }
+
+  const newId = makeProjectId();
+  const newName = `${source.name || defaults.projectName} 복사본`;
+  const sourceOutline = Array.isArray(source.outline) ? source.outline : [];
+  const duplicatedOutline = sourceOutline.map((item) => ({
+    ...item,
+    projectId: newId,
+    projectName: newName,
+    updatedAt: new Date().toISOString(),
+  }));
+  const duplicated = {
+    ...source,
+    id: newId,
+    name: newName,
+    form: {
+      ...(source.form || {}),
+      activeProjectId: newId,
+      projectName: newName,
+    },
+    outline: duplicatedOutline,
+    updatedAt: new Date().toISOString(),
+  };
+
+  projects.push(duplicated);
+  activeProjectId = newId;
+  saveProjects(projects);
+  localStorage.setItem(scopedStorageKey(BOOK_OUTLINE_STORAGE_KEY), JSON.stringify(duplicatedOutline));
+  isApplyingProject = true;
+  renderProjects(projects);
+  applyFormSnapshot({
+    ...duplicated.form,
+    projectName: duplicated.name,
+    bookTitle: duplicated.bookTitle || duplicated.form?.bookTitle || "",
+  });
+  isApplyingProject = false;
+  persistForm();
+  renderBookOutline();
+  loadStatus();
+  writeLog(`책 프로젝트를 복제했습니다: ${newName}`);
+}
+
+function deleteProject(projectId = activeProjectId) {
+  const projects = loadProjects();
+  const target = projects.find((project) => project.id === projectId);
+  if (!target) {
+    setProjectState("삭제할 프로젝트 없음");
+    return;
+  }
+  if (projects.length <= 1) {
+    writeLog("프로젝트가 1개만 있을 때는 삭제할 수 없습니다. 새 프로젝트를 먼저 만들어 주세요.");
+    setProjectState("삭제 불가");
+    return;
+  }
+  if (!window.confirm(`책 프로젝트를 삭제할까요?\n${target.name || "이름 없음"}`)) {
+    return;
+  }
+
+  const nextProjects = projects.filter((project) => project.id !== projectId);
+  if (projectId === activeProjectId) {
+    activeProjectId = nextProjects[0]?.id || "default";
+  }
+  saveProjects(nextProjects);
+  localStorage.removeItem(`${BOOK_OUTLINE_STORAGE_KEY}:${projectId}`);
+  const next = activeProject(nextProjects);
+  isApplyingProject = true;
+  renderProjects(nextProjects);
+  applyFormSnapshot({
+    ...next.form,
+    projectName: next.name,
+    bookTitle: next.bookTitle || next.form?.bookTitle || "",
+  });
+  isApplyingProject = false;
+  persistForm();
+  renderBookOutline();
+  loadStatus();
+  setProjectState("삭제됨");
+  writeLog(`책 프로젝트를 삭제했습니다: ${target.name || "이름 없음"}`);
 }
 
 function switchProject(projectId) {
@@ -542,6 +705,14 @@ function handleProjectCardAction(event) {
       switchProject(projectId);
     }
     showView("writing");
+    return;
+  }
+  if (button.dataset.projectAction === "duplicate") {
+    duplicateProject(projectId);
+    return;
+  }
+  if (button.dataset.projectAction === "delete") {
+    deleteProject(projectId);
   }
 }
 
@@ -1195,6 +1366,44 @@ function selectedIdeaType() {
   return document.querySelector("input[name='ideaType']:checked")?.value || "case";
 }
 
+function entryInclusionKey() {
+  return scopedStorageKey(ENTRY_INCLUSION_STORAGE_KEY);
+}
+
+function loadEntryInclusion() {
+  return readStoredJson(entryInclusionKey(), {});
+}
+
+function saveEntryInclusion(map) {
+  localStorage.setItem(entryInclusionKey(), JSON.stringify(map));
+}
+
+function isEntryIncluded(entryId) {
+  const inclusion = loadEntryInclusion();
+  return inclusion[entryId] !== false;
+}
+
+function includedEntryIds() {
+  return currentEntries.filter((entry) => isEntryIncluded(entry.id)).map((entry) => entry.id);
+}
+
+function setEntryIncluded(entryId, included) {
+  const inclusion = loadEntryInclusion();
+  inclusion[entryId] = included;
+  saveEntryInclusion(inclusion);
+  renderEntries(currentEntries);
+  renderPreflightChecklist();
+  persistForm();
+}
+
+function exportOptionsPayload() {
+  return {
+    chapterNumber: chapterNumberInput.value.trim(),
+    includeCover: includeCoverInput.checked,
+    includeToc: includeTocInput.checked,
+  };
+}
+
 function commonPayload() {
   return {
     projectId: activeProjectId,
@@ -1205,6 +1414,9 @@ function commonPayload() {
     weekEnd: weekEndInput.value,
     chapterTitle: chapterTitleInput.value.trim(),
     draftType: draftTypeInput.value,
+    chapterTemplate: chapterTemplateInput.value,
+    includedEntryIds: includedEntryIds(),
+    exportOptions: exportOptionsPayload(),
     bookContext: bookContextInput.value.trim(),
     targetReader: targetReaderInput.value.trim(),
     chapterGoal: chapterGoalInput.value.trim(),
@@ -1312,6 +1524,8 @@ function renderStatus(data) {
   renderObsidianConnection(data.obsidianConnection);
   renderLlmConnection(data.llmConnection);
   renderEntries(entries);
+  renderPreflightChecklist();
+  updateObsidianPreview();
   if (Object.prototype.hasOwnProperty.call(data, "markdown")) {
     renderDraft(data);
   }
@@ -1324,16 +1538,20 @@ function renderStatus(data) {
 function renderLlmConnection(connection) {
   if (!connection) {
     llmConnectionStatus.textContent = "LLM 미확인";
+    llmConnectionNote.textContent = "LLM 연결 상태를 아직 확인하지 못했습니다.";
     return;
   }
 
   if (connection.configured) {
     const provider = connection.provider === "azure-openai" ? "Azure OpenAI" : "OpenAI";
+    const model = llmModelInput.value.trim() || connection.model || "기본 모델";
     llmConnectionStatus.textContent = `${provider} 연결됨`;
+    llmConnectionNote.textContent = `${provider} · model=${model} · endpoint=${connection.endpoint || "기본값"}`;
     return;
   }
 
   llmConnectionStatus.textContent = "LLM 키 필요";
+  llmConnectionNote.textContent = "API 키가 없으면 구조화 초안과 기본 점검 규칙으로 동작합니다. .env에 키를 넣으면 AI 확장이 활성화됩니다.";
 }
 
 function renderObsidianConnection(connection) {
@@ -1363,6 +1581,114 @@ function renderObsidianConnection(connection) {
   obsidianConnectionNote.textContent = "이 PC에서 Obsidian 앱을 찾지 못했습니다.";
 }
 
+function safePreviewName(value) {
+  return String(value || "book-draft")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 120) || "book-draft";
+}
+
+function updateObsidianPreview(check = null) {
+  if (check?.savePreview) {
+    obsidianSavePreview.textContent = `저장 위치: ${check.savePreview}`;
+    return;
+  }
+  const vault = vaultInput.value.trim() || "(자동 감지 vault)";
+  const folder = chapterFolderInput.value.trim() || "Book Drafts";
+  const project = safePreviewName(projectNameInput.value || bookTitleInput.value || activeProjectId);
+  const title = safePreviewName(chapterTitleInput.value || "챕터 제목");
+  obsidianSavePreview.textContent = `저장 위치 미리보기: ${vault}/${folder}/${project}/${title}.md`;
+}
+
+function renderObsidianCheck(data) {
+  const parts = [];
+  if (data.vaultPath) {
+    parts.push(data.vaultExists ? `Vault 확인: ${data.vaultPath}` : `Vault 없음: ${data.vaultPath}`);
+  } else {
+    parts.push("Vault 경로를 입력하거나 Obsidian에서 vault를 열어 주세요.");
+  }
+  if (data.importFolder) {
+    parts.push(data.importFolderExists ? `가져올 폴더 확인: ${data.importFolder}` : `가져올 폴더 없음: ${data.importFolder}`);
+  }
+  if (data.savePreview) {
+    parts.push(`저장 예정 위치: ${data.savePreview}`);
+  }
+  obsidianConnectionNote.textContent = parts.join(" · ");
+  obsidianConnectionStatus.textContent = data.connected ? "Obsidian 연결됨" : "Obsidian 확인 필요";
+  updateObsidianPreview(data);
+}
+
+async function testObsidianConnection() {
+  persistForm();
+  setBusy(true);
+  writeLog("Obsidian 연결을 테스트하는 중...");
+  try {
+    const data = await requestJson("/api/check-obsidian", obsidianPayload());
+    renderObsidianConnection(data.obsidianConnection);
+    renderObsidianCheck(data);
+    writeLog(data.message || "Obsidian 연결 테스트를 완료했습니다.");
+  } catch (error) {
+    obsidianConnectionStatus.textContent = "Obsidian 확인 필요";
+    obsidianConnectionNote.textContent = error.message;
+    writeLog(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function preflightItems() {
+  const selectedCount = includedEntryIds().length;
+  return [
+    {
+      label: "챕터 제목",
+      ok: Boolean(chapterTitleInput.value.trim()),
+      detail: chapterTitleInput.value.trim() ? "제목이 준비됐습니다." : "챕터 제목을 먼저 적어 주세요.",
+    },
+    {
+      label: "원고 재료",
+      ok: selectedCount > 0,
+      detail: selectedCount > 0 ? `${selectedCount}개 재료를 반영합니다.` : "반영할 재료를 1개 이상 선택해 주세요.",
+    },
+    {
+      label: "독자/목표",
+      ok: Boolean(targetReaderInput.value.trim() && chapterGoalInput.value.trim()),
+      detail: targetReaderInput.value.trim() && chapterGoalInput.value.trim() ? "독자와 목표가 잡혔습니다." : "예상 독자와 이번 원고 목표를 채워 주세요.",
+    },
+    {
+      label: "분량 단서",
+      ok: currentEntries.some((entry) => isEntryIncluded(entry.id) && characterCount(entry.description) >= 80),
+      detail: "구체적인 장면이나 설명이 긴 재료가 있으면 초안 품질이 좋아집니다.",
+    },
+  ];
+}
+
+function renderPreflightChecklist() {
+  const items = preflightItems();
+  const okCount = items.filter((item) => item.ok).length;
+  preflightState.textContent = `${okCount}/${items.length} 준비`;
+  preflightChecklist.innerHTML = items
+    .map((item) => `
+      <div class="preflight-item ${item.ok ? "is-ok" : "is-warn"}">
+        <strong>${escapeHtml(item.label)}</strong>
+        <span>${escapeHtml(item.detail)}</span>
+      </div>
+    `)
+    .join("");
+}
+
+function generationReady() {
+  const blockers = preflightItems()
+    .filter((item) => !item.ok && item.label !== "분량 단서")
+    .map((item) => item.detail);
+  if (!blockers.length) {
+    return true;
+  }
+  writeLog(`초안 생성 전 확인이 필요합니다.\n- ${blockers.join("\n- ")}`);
+  setDraftState("확인 필요");
+  return false;
+}
+
 function renderEntries(entries) {
   currentEntries = entries;
   entryCount.textContent = `${entries.length}개`;
@@ -1381,16 +1707,22 @@ function renderEntries(entries) {
       const type = typeLabels[entry.type] || entry.type || "항목";
       const source = entry.sourceFile === "obsidian" ? "Obsidian" : "직접 등록";
       const canEdit = entry.sourceFile === "manual";
+      const included = isEntryIncluded(entry.id);
       return `
         <article class="entry-item" data-entry-id="${escapeHtml(entry.id || "")}">
           <div class="entry-meta">
             <span>${entry.registered_at || "-"}</span>
             <span>${type}</span>
             <span>${source}</span>
+            <span>${included ? "원고 반영" : "보류"}</span>
           </div>
           <h3>${escapeHtml(entry.term || "제목 없음")}</h3>
           <p>${escapeHtml(entry.description || "")}</p>
           ${entry.context ? `<small>${escapeHtml(entry.context)}</small>` : ""}
+          <label class="check-row entry-include">
+            <input type="checkbox" data-entry-action="include" data-entry-id="${escapeHtml(entry.id)}" ${included ? "checked" : ""} />
+            <span>이번 원고에 반영</span>
+          </label>
           ${
             canEdit
               ? `<div class="entry-actions">
@@ -1476,6 +1808,47 @@ function renderMarkdown(value) {
     html.push("</ul>");
   }
   return html.join("");
+}
+
+function draftWithoutFrontmatter(markdown) {
+  return String(markdown || "").replace(/^---[\s\S]*?\n---\s*/m, "").trim();
+}
+
+function exportPreviewMarkdown() {
+  const body = draftWithoutFrontmatter(draftPreview.value);
+  if (!body) {
+    return "";
+  }
+  const title = chapterTitleInput.value.trim() || body.match(/^#\s+(.+)$/m)?.[1]?.trim() || "원고";
+  const chapterNumber = chapterNumberInput.value.trim();
+  const displayTitle = chapterNumber && !/^제\s*\S+\s*장/.test(title) ? `제 ${chapterNumber}장. ${title}` : title;
+  const headings = body
+    .split(/\r?\n/)
+    .map((line) => line.match(/^##\s+(.+)$/))
+    .filter(Boolean)
+    .map((match) => `- ${match[1].trim()}`);
+  const lines = [];
+  if (includeCoverInput.checked) {
+    lines.push(`# ${bookTitleInput.value.trim() || projectNameInput.value.trim() || "책 원고"}`, "", `## ${displayTitle}`, "", `- 프로젝트: ${projectNameInput.value.trim() || "미정"}`, `- 기간: ${weekStartInput.value || "시작일"} - ${weekEndInput.value || "종료일"}`, "");
+  }
+  if (includeTocInput.checked && headings.length) {
+    lines.push("## 목차", "", ...headings, "");
+  }
+  lines.push(body.replace(/^#\s+(.+)$/m, `# ${displayTitle}`));
+  return `${lines.join("\n").replace(/\n{3,}/g, "\n\n")}\n`;
+}
+
+function renderExportPreview() {
+  const markdown = exportPreviewMarkdown();
+  if (!markdown) {
+    exportPreview.hidden = false;
+    exportPreviewState.textContent = "확인 필요";
+    exportPreviewBody.textContent = "미리볼 원고 초안을 먼저 만들거나 직접 입력해 주세요.";
+    return;
+  }
+  exportPreview.hidden = false;
+  exportPreviewState.textContent = `${characterCount(markdown)}자`;
+  exportPreviewBody.innerHTML = renderMarkdown(markdown);
 }
 
 function renderReview(data) {
@@ -1603,6 +1976,7 @@ function renderLastRun(lastRun) {
 
   const actionLabels = {
     "add-idea": "아이디어 등록",
+    "check-obsidian": "Obsidian 연결 테스트",
     "delete-idea": "재료 삭제",
     "build-prompt": "원고 초안 생성",
     "generate-chapter": "AI 초안 생성",
@@ -1636,10 +2010,18 @@ async function loadStatus() {
     weekStart: weekStartInput.value,
     weekEnd: weekEndInput.value,
   });
-  const response = await fetch(`/api/status?${params.toString()}`);
-  const data = await response.json();
-  if (data.ok) {
-    renderStatus(data);
+  try {
+    const response = await fetch(`/api/status?${params.toString()}`);
+    const data = await response.json();
+    if (data.ok) {
+      statusErrorShown = false;
+      renderStatus(data);
+    }
+  } catch (error) {
+    if (!statusErrorShown) {
+      statusErrorShown = true;
+      writeLog(`상태 조회를 잠시 가져오지 못했습니다. UI 서버가 실행 중인지 확인해 주세요.\n${error.message}`);
+    }
   }
 }
 
@@ -1765,6 +2147,11 @@ function handleEntryAction(event) {
     return;
   }
 
+  if (button.dataset.entryAction === "include") {
+    setEntryIncluded(entryId, button.checked);
+    return;
+  }
+
   if (button.dataset.entryAction === "edit") {
     startEditEntry(entry);
     return;
@@ -1776,7 +2163,8 @@ function handleEntryAction(event) {
 }
 
 async function importObsidian(event) {
-  event.preventDefault();
+  event?.preventDefault();
+  setRetryAction("Obsidian 가져오기", importObsidian);
   persistForm();
   setBusy(true);
   writeLog("Obsidian 가져오는 중...");
@@ -1784,6 +2172,7 @@ async function importObsidian(event) {
     const data = await requestJson("/api/import-obsidian", obsidianPayload());
     renderStatus(data);
     writeLog(data.lastRun?.message || [data.importStdout, data.buildStdout].filter(Boolean).join("\n"));
+    clearRetryAction();
   } catch (error) {
     writeLog(error.message);
   } finally {
@@ -1791,7 +2180,32 @@ async function importObsidian(event) {
   }
 }
 
+function setRetryAction(label, handler) {
+  lastRetryAction = { label, handler };
+  retryLastButton.textContent = `${label} 재시도`;
+  retryLastButton.disabled = isBusyState;
+}
+
+function clearRetryAction() {
+  lastRetryAction = null;
+  retryLastButton.textContent = "재시도";
+  retryLastButton.disabled = true;
+}
+
+async function retryLastAction() {
+  if (!lastRetryAction || isBusyState) {
+    return;
+  }
+  const action = lastRetryAction;
+  writeLog(`${action.label} 작업을 다시 시도합니다.`);
+  await action.handler();
+}
+
 async function generateDraft() {
+  if (!generationReady()) {
+    return;
+  }
+  setRetryAction("초안 만들기", generateDraft);
   persistForm();
   setBusy(true);
   setDraftState("생성 중");
@@ -1802,6 +2216,7 @@ async function generateDraft() {
     renderStatus(data);
     await saveDraftVersion(data.llmStatus === "expanded" ? "AI 초안 생성" : "구조 초안 생성", { silent: true });
     writeLog(data.lastRun?.message || data.llmMessage || "원고 초안을 생성했습니다.");
+    clearRetryAction();
   } catch (error) {
     setDraftState("확인 필요");
     writeLog(error.message);
@@ -1818,6 +2233,7 @@ async function reviewDraft(options = {}) {
     return;
   }
 
+  setRetryAction("품질 점검", () => reviewDraft(options));
   persistForm();
   setBusy(true);
   setReviewState("점검 중");
@@ -1826,6 +2242,7 @@ async function reviewDraft(options = {}) {
     const data = await requestJson("/api/review-draft", draftReviewPayload(options));
     renderStatus(data);
     writeLog(data.lastRun?.message || data.reviewMessage || "원고 품질을 점검했습니다.");
+    clearRetryAction();
   } catch (error) {
     setReviewState("확인 필요");
     reviewOutput.textContent = error.message;
@@ -1843,6 +2260,7 @@ async function polishDraft() {
     return;
   }
 
+  setRetryAction("출판 정리", polishDraft);
   persistForm();
   setBusy(true);
   setDraftState("정리 중");
@@ -1853,6 +2271,7 @@ async function polishDraft() {
     renderStatus(data);
     await saveDraftVersion("출판 정리본", { silent: true });
     writeLog(data.lastRun?.message || data.polishMessage || "출판용 원고로 정리했습니다.");
+    clearRetryAction();
   } catch (error) {
     setDraftState("확인 필요");
     writeLog(error.message);
@@ -1862,6 +2281,7 @@ async function polishDraft() {
 }
 
 async function exportChapter() {
+  setRetryAction("편집본 저장", exportChapter);
   persistForm();
   setBusy(true);
   setDraftState("저장 중");
@@ -1871,6 +2291,7 @@ async function exportChapter() {
     renderStatus(data);
     await saveDraftVersion("Obsidian 저장", { silent: true });
     writeLog(data.lastRun?.message || `저장했습니다: ${data.filePath}`);
+    clearRetryAction();
   } catch (error) {
     setDraftState("확인 필요");
     writeLog(error.message);
@@ -1887,6 +2308,7 @@ async function exportManuscript(format) {
     return;
   }
 
+  setRetryAction(`${format.toUpperCase()} 내보내기`, () => exportManuscript(format));
   persistForm();
   setBusy(true);
   writeLog(`${format.toUpperCase()} 원고 파일을 만드는 중...`);
@@ -1894,6 +2316,7 @@ async function exportManuscript(format) {
     const data = await requestJson("/api/export-manuscript", manuscriptExportPayload(format));
     renderStatus(data);
     writeLog(data.lastRun?.message || `${format.toUpperCase()} 파일을 만들었습니다: ${data.filePath}`);
+    clearRetryAction();
   } catch (error) {
     writeLog(error.message);
   } finally {
@@ -1913,8 +2336,18 @@ exportPdfButton.addEventListener("click", () => exportManuscript("pdf"));
 projectSelect.addEventListener("change", () => switchProject(projectSelect.value));
 createProjectButton.addEventListener("click", createProject);
 saveProjectButton.addEventListener("click", () => saveActiveProject());
+duplicateProjectButton.addEventListener("click", () => duplicateProject());
+deleteProjectButton.addEventListener("click", () => deleteProject());
 openWritingButton.addEventListener("click", openWritingView);
 projectCards.addEventListener("click", handleProjectCardAction);
+projectSearchInput.addEventListener("input", () => {
+  projectSearchTerm = projectSearchInput.value;
+  renderProjectCards(loadProjects());
+});
+projectSortInput.addEventListener("change", () => {
+  projectSortMode = projectSortInput.value;
+  renderProjectCards(loadProjects());
+});
 for (const tab of workspaceTabs) {
   tab.addEventListener("click", () => showView(tab.dataset.viewTab || "projects"));
 }
@@ -1935,10 +2368,15 @@ cancelEditButton.addEventListener("click", () => {
   setSaveState("준비됨");
 });
 loadWritingExample.addEventListener("click", fillWritingExample);
+previewExportButton.addEventListener("click", renderExportPreview);
+testObsidianButton.addEventListener("click", testObsidianConnection);
+retryLastButton.addEventListener("click", retryLastAction);
 thisWeekButton.addEventListener("click", () => {
   setDefaultWeek();
   persistForm();
   updateInputMeters();
+  renderPreflightChecklist();
+  updateObsidianPreview();
   loadStatus();
 });
 useExample.addEventListener("click", () => {
@@ -1952,13 +2390,29 @@ loadSavedDraftsButton.addEventListener("click", loadSavedDrafts);
 savedDraftList.addEventListener("click", handleSavedDraftAction);
 
 for (const input of document.querySelectorAll("input, textarea, select")) {
-  if (input === projectSelect) {
+  if (input === projectSelect || input === projectSearchInput || input === projectSortInput) {
     continue;
   }
   input.addEventListener("input", () => {
     persistForm();
     if (input === ideaTitleInput || input === ideaDetailInput) {
       updateInputMeters();
+    }
+    if (
+      [
+        chapterTitleInput,
+        targetReaderInput,
+        chapterGoalInput,
+        projectNameInput,
+        bookTitleInput,
+        chapterNumberInput,
+        vaultInput,
+        chapterFolderInput,
+      ].includes(input)
+    ) {
+      renderPreflightChecklist();
+      updateObsidianPreview();
+      renderProjectCards(loadProjects());
     }
     if (input === chapterTitleInput) {
       obsidianDraftVersions = [];
@@ -1967,8 +2421,14 @@ for (const input of document.querySelectorAll("input, textarea, select")) {
   });
   input.addEventListener("change", () => {
     persistForm();
+    if ([draftTypeInput, chapterTemplateInput, includeCoverInput, includeTocInput, expandWithLlmInput].includes(input)) {
+      renderPreflightChecklist();
+      updateObsidianPreview();
+    }
     if (input === weekStartInput || input === weekEndInput) {
       obsidianDraftVersions = [];
+      renderPreflightChecklist();
+      updateObsidianPreview();
       loadStatus();
       renderDraftVersions();
     }
@@ -1982,5 +2442,7 @@ updateInputMeters();
 renderBookOutline();
 renderSavedDrafts();
 renderDraftVersions();
+renderPreflightChecklist();
+updateObsidianPreview();
 loadStatus();
 setInterval(loadStatus, 5000);

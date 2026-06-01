@@ -18,6 +18,7 @@
           <span id="obsidianCount">가져온 항목 0</span>
           <span id="obsidianConnectionStatus">Obsidian 확인 중</span>
           <span id="llmConnectionStatus">LLM 확인 중</span>
+          <span id="busyIndicator">대기</span>
         </div>
       </header>
 
@@ -59,6 +60,8 @@
               <div class="project-actions">
                 <button type="button" class="secondary-button" id="createProjectButton">새 프로젝트</button>
                 <button type="button" class="secondary-button" id="saveProjectButton">프로젝트 저장</button>
+                <button type="button" class="secondary-button" id="duplicateProjectButton">복제</button>
+                <button type="button" class="ghost-button danger-action" id="deleteProjectButton">삭제</button>
                 <button type="button" class="primary-button" id="openWritingButton">원고 작성</button>
               </div>
             </div>
@@ -68,6 +71,20 @@
             <div class="panel-heading">
               <h2>프로젝트 목록</h2>
               <span id="projectListCount" class="state-text">0개</span>
+            </div>
+            <div class="project-list-tools">
+              <label>
+                <span>검색</span>
+                <input id="projectSearch" type="search" autocomplete="off" placeholder="프로젝트명 또는 책 제목" />
+              </label>
+              <label>
+                <span>정렬</span>
+                <select id="projectSort">
+                  <option value="updated-desc">최근 수정순</option>
+                  <option value="name-asc">이름순</option>
+                  <option value="outline-desc">챕터 많은순</option>
+                </select>
+              </label>
             </div>
             <div id="projectCards" class="project-cards"></div>
           </section>
@@ -118,6 +135,15 @@
               </select>
             </label>
             <label>
+              <span>챕터 템플릿</span>
+              <select id="chapterTemplate">
+                <option value="scene">장면에서 시작</option>
+                <option value="problem">문제-해결</option>
+                <option value="lesson">교훈/통찰</option>
+                <option value="howto">실행 가이드</option>
+              </select>
+            </label>
+            <label>
               <span>예상 독자</span>
               <input id="targetReader" type="text" />
             </label>
@@ -138,6 +164,14 @@
               <span>AI로 출판용 확장</span>
             </label>
           </div>
+        </section>
+
+        <section class="panel preflight-panel" aria-live="polite">
+          <div class="panel-heading">
+            <h2>생성 전 체크</h2>
+            <span id="preflightState" class="state-text">확인 중</span>
+          </div>
+          <div id="preflightChecklist" class="preflight-list"></div>
         </section>
 
         <section class="studio-main">
@@ -244,8 +278,23 @@
               <button type="button" class="secondary-button" id="polishDraftButton">출판 정리</button>
               <button type="button" class="secondary-button" id="reviewDraftButton">품질 점검</button>
               <button type="button" class="secondary-button" id="exportChapterButton">편집본 저장</button>
+              <button type="button" class="secondary-button" id="previewExportButton">미리보기</button>
               <button type="button" class="secondary-button" id="exportDocxButton">DOCX</button>
               <button type="button" class="secondary-button" id="exportPdfButton">PDF</button>
+            </div>
+            <div class="export-options">
+              <label>
+                <span>챕터 번호</span>
+                <input id="chapterNumber" type="text" autocomplete="off" placeholder="예: 3" />
+              </label>
+              <label class="check-row">
+                <input id="includeCover" type="checkbox" checked />
+                <span>표지 포함</span>
+              </label>
+              <label class="check-row">
+                <input id="includeToc" type="checkbox" checked />
+                <span>목차 포함</span>
+              </label>
             </div>
             <textarea
               id="draftPreview"
@@ -253,6 +302,13 @@
               placeholder="원고 초안이 여기에 표시됩니다. 직접 수정할 수 있습니다."
             ></textarea>
             <div class="draft-meta" id="draftMeta">아직 생성된 원고가 없습니다.</div>
+            <section class="export-preview" id="exportPreview" hidden>
+              <div class="panel-heading review-heading">
+                <h3>내보내기 미리보기</h3>
+                <span id="exportPreviewState" class="state-text">대기 중</span>
+              </div>
+              <div id="exportPreviewBody" class="review-output"></div>
+            </section>
             <section class="review-panel" aria-live="polite">
               <div class="panel-heading review-heading">
                 <h3>원고 점검 결과</h3>
@@ -320,7 +376,10 @@
         <section class="panel run-panel" aria-live="polite">
           <div class="panel-heading">
             <h2>실행 기록</h2>
-            <span class="state-text">최근 작업</span>
+            <div class="heading-actions">
+              <span class="state-text">최근 작업</span>
+              <button type="button" class="secondary-button compact-button" id="retryLastButton" disabled>재시도</button>
+            </div>
           </div>
           <div class="run-grid">
             <div>
@@ -366,6 +425,19 @@
           </div>
         </section>
 
+        <section class="panel llm-panel">
+          <div class="panel-heading">
+            <h2>LLM 연결</h2>
+            <span id="llmConnectionNote" class="connection-note">LLM 연결 상태를 확인 중입니다.</span>
+          </div>
+          <div class="settings-grid">
+            <label>
+              <span>LLM 모델</span>
+              <input id="llmModel" type="text" autocomplete="off" placeholder="gpt-4.1-mini" />
+            </label>
+          </div>
+        </section>
+
         <section class="panel import-panel">
           <div class="panel-heading">
             <h2>Obsidian 원고함</h2>
@@ -388,16 +460,14 @@
               <span>원고 저장 폴더</span>
               <input id="chapterFolder" type="text" autocomplete="off" placeholder="Book Drafts" />
             </label>
-            <label>
-              <span>LLM 모델</span>
-              <input id="llmModel" type="text" autocomplete="off" placeholder="gpt-4.1-mini" />
-            </label>
             <label class="check-row">
               <input id="includeAll" type="checkbox" />
               <span>선택 폴더의 모든 Markdown 가져오기</span>
             </label>
+            <div class="save-preview" id="obsidianSavePreview">저장 위치 미리보기 대기</div>
             <div class="actions import-actions">
               <button type="button" class="ghost-button" id="useExample">예시 경로</button>
+              <button type="button" class="secondary-button" id="testObsidianButton">연결 테스트</button>
               <button type="submit" class="secondary-button" id="importButton">가져오기</button>
               <button type="button" class="secondary-button" id="exportChapterPanelButton">편집본 저장</button>
             </div>
