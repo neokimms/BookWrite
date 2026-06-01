@@ -1,0 +1,13 @@
+{
+  "name": "book-writing-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Expand user ideas, cases, and notes into book-ready chapter or case drafts.",
+  "scripts": {
+    "start": "python3 scripts/npm_start.py",
+    "ui": "node ui/server.js",
+    "prompt": "python3 scripts/build_prompt.py --input data/weekly_terms.csv --out output/book-draft-prompt.md",
+    "import:obsidian": "python3 scripts/import_obsidian.py",
+    "test:smoke": "python3 scripts/smoke_test.py"
+  }
+}

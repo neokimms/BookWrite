@@ -1,0 +1,9 @@
+.env
+.env.*
+!.env.example
+node_modules/
+__pycache__/
+*.pyc
+data/weekly_terms.csv
+data/weekly_terms.from_obsidian*.csv
+output/
