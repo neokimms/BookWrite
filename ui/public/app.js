@@ -57,6 +57,9 @@ const previewExportButton = document.querySelector("#previewExportButton");
 const exportPreview = document.querySelector("#exportPreview");
 const exportPreviewState = document.querySelector("#exportPreviewState");
 const exportPreviewBody = document.querySelector("#exportPreviewBody");
+const exportResult = document.querySelector("#exportResult");
+const exportResultState = document.querySelector("#exportResultState");
+const exportResultBody = document.querySelector("#exportResultBody");
 const savedDraftCount = document.querySelector("#savedDraftCount");
 const savedDraftList = document.querySelector("#savedDraftList");
 const reviewOutput = document.querySelector("#reviewOutput");
@@ -1470,6 +1473,7 @@ function manuscriptExportPayload(format) {
   return {
     ...editedDraftPayload(),
     format,
+    preparedMarkdown: exportPreviewMarkdown(),
   };
 }
 
@@ -1849,6 +1853,20 @@ function renderExportPreview() {
   exportPreview.hidden = false;
   exportPreviewState.textContent = `${characterCount(markdown)}자`;
   exportPreviewBody.innerHTML = renderMarkdown(markdown);
+}
+
+function renderExportResult(data, format) {
+  exportResult.hidden = false;
+  exportResultState.textContent = `${format.toUpperCase()} 완료`;
+  const filePath = data.filePath || "";
+  const markdownPath = data.markdownPath || "";
+  const downloadUrl = data.downloadUrl || "";
+  exportResultBody.innerHTML = `
+    <p>${escapeHtml(data.lastRun?.message || `${format.toUpperCase()} 파일을 만들었습니다.`)}</p>
+    ${filePath ? `<p><strong>파일</strong><br>${escapeHtml(filePath)}</p>` : ""}
+    ${markdownPath ? `<p><strong>Markdown</strong><br>${escapeHtml(markdownPath)}</p>` : ""}
+    ${downloadUrl ? `<p><a class="download-link" href="${escapeHtml(downloadUrl)}">다운로드</a></p>` : ""}
+  `;
 }
 
 function renderReview(data) {
@@ -2308,6 +2326,9 @@ async function exportManuscript(format) {
     return;
   }
 
+  renderExportPreview();
+  exportResult.hidden = true;
+  exportResultState.textContent = "생성 중";
   setRetryAction(`${format.toUpperCase()} 내보내기`, () => exportManuscript(format));
   persistForm();
   setBusy(true);
@@ -2315,6 +2336,7 @@ async function exportManuscript(format) {
   try {
     const data = await requestJson("/api/export-manuscript", manuscriptExportPayload(format));
     renderStatus(data);
+    renderExportResult(data, format);
     writeLog(data.lastRun?.message || `${format.toUpperCase()} 파일을 만들었습니다: ${data.filePath}`);
     clearRetryAction();
   } catch (error) {

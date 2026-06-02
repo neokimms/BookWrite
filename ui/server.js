@@ -1015,6 +1015,16 @@ function prepareManuscriptMarkdown(markdown, payload, title) {
   return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;
 }
 
+function outputFileReady(filePath) {
+  return fs.existsSync(filePath) && fs.statSync(filePath).size > 0;
+}
+
+function ensureOutputFile(filePath, label) {
+  if (!outputFileReady(filePath)) {
+    throw new Error(`${label} 파일을 만들지 못했습니다: ${filePath}`);
+  }
+}
+
 function exportTemplateInfo(template) {
   const templates = {
     manuscript: {
@@ -1602,7 +1612,8 @@ async function exportManuscriptFile(payload) {
 
   const title = String(payload.chapterTitle || titleFromMarkdown(sourceMarkdown) || "book-manuscript").trim();
   const template = exportTemplateInfo(payload.exportTemplate);
-  const markdown = prepareManuscriptMarkdown(sourceMarkdown, payload, title);
+  const preparedMarkdown = String(payload.preparedMarkdown || "").trim();
+  const markdown = preparedMarkdown ? `${preparedMarkdown}\n` : prepareManuscriptMarkdown(sourceMarkdown, payload, title);
   const exportDir = path.join(ROOT, "output", "exports");
   fs.mkdirSync(exportDir, { recursive: true });
   const baseName = `${localTimestampForFile()}_${safeFileName(title)}`;
@@ -1612,14 +1623,21 @@ async function exportManuscriptFile(payload) {
 
   if (format === "docx") {
     await runCommand(PANDOC, [mdPath, "-o", filePath, "--metadata", `title=${title}`]);
+    ensureOutputFile(filePath, "DOCX");
   } else {
+    let swiftReady = false;
     try {
       await runCommand(SWIFT, ["scripts/markdown_to_pdf.swift", mdPath, filePath, template.id]);
+      swiftReady = outputFileReady(filePath);
     } catch (swiftError) {
+      swiftReady = false;
+    }
+    if (!swiftReady) {
       const htmlPath = path.join(exportDir, `${baseName}.html`);
       fs.writeFileSync(htmlPath, manuscriptHtmlDocument(title, markdown, template.id), "utf8");
       await runCommandToFile(CUPSFILTER, ["-m", "application/pdf", htmlPath], filePath);
     }
+    ensureOutputFile(filePath, "PDF");
   }
 
   const lastRun = writeRunState({
@@ -1631,6 +1649,7 @@ async function exportManuscriptFile(payload) {
   return {
     filePath,
     markdownPath: mdPath,
+    downloadUrl: `/api/export-file?path=${encodeURIComponent(filePath)}`,
     format,
     exportTemplate: template.id,
     exportTemplateLabel: template.label,
@@ -2207,6 +2226,31 @@ function getStatus(projectId = "default") {
   };
 }
 
+function serveExportFile(request, requestUrl, response) {
+  const requestedPath = requestUrl.searchParams.get("path") || "";
+  const exportRoot = path.join(ROOT, "output", "exports");
+  const filePath = path.resolve(requestedPath);
+  const insideExportRoot = filePath === exportRoot || filePath.startsWith(`${exportRoot}${path.sep}`);
+  if (!insideExportRoot || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    sendJson(response, 404, { ok: false, error: "내보내기 파일을 찾지 못했습니다." });
+    return;
+  }
+
+  const extension = path.extname(filePath).toLowerCase();
+  const contentType = extension === ".pdf"
+    ? "application/pdf"
+    : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  response.writeHead(200, {
+    "Content-Type": contentType,
+    "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(path.basename(filePath))}`,
+  });
+  if (request.method === "HEAD") {
+    response.end();
+    return;
+  }
+  fs.createReadStream(filePath).pipe(response);
+}
+
 function serveStatic(request, response) {
   const requestUrl = new URL(request.url, `http://${request.headers.host}`);
   const rawPath = decodeURIComponent(requestUrl.pathname);
@@ -2242,6 +2286,11 @@ async function handleApi(request, response) {
         ...getStatus(projectId),
         entries: entriesForRange(weekStart, weekEnd, projectId),
       });
+      return;
+    }
+
+    if ((request.method === "GET" || request.method === "HEAD") && requestUrl.pathname === "/api/export-file") {
+      serveExportFile(request, requestUrl, response);
       return;
     }
 

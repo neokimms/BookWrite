@@ -273,14 +273,44 @@
               <h2>원고 초안 편집</h2>
               <span id="draftState" class="state-text">대기 중</span>
             </div>
-            <div class="draft-actions">
-              <button type="button" class="primary-button" id="buildButton">초안 만들기</button>
-              <button type="button" class="secondary-button" id="polishDraftButton">출판 정리</button>
-              <button type="button" class="secondary-button" id="reviewDraftButton">품질 점검</button>
-              <button type="button" class="secondary-button" id="exportChapterButton">편집본 저장</button>
-              <button type="button" class="secondary-button" id="previewExportButton">미리보기</button>
-              <button type="button" class="secondary-button" id="exportDocxButton">DOCX</button>
-              <button type="button" class="secondary-button" id="exportPdfButton">PDF</button>
+            <div class="draft-workflow-actions" aria-label="원고 작업 순서">
+              <section class="draft-action-group is-primary">
+                <div class="action-step">
+                  <span>1</span>
+                  <strong>초안 생성</strong>
+                </div>
+                <button type="button" class="primary-button draft-main-button" id="buildButton">초안 만들기</button>
+              </section>
+              <section class="draft-action-group">
+                <div class="action-step">
+                  <span>2</span>
+                  <strong>점검/정리</strong>
+                </div>
+                <div class="action-button-row">
+                  <button type="button" class="secondary-button" id="reviewDraftButton">품질 점검</button>
+                  <button type="button" class="secondary-button" id="polishDraftButton">출판 정리</button>
+                </div>
+              </section>
+              <section class="draft-action-group">
+                <div class="action-step">
+                  <span>3</span>
+                  <strong>확인/저장</strong>
+                </div>
+                <div class="action-button-row">
+                  <button type="button" class="secondary-button" id="previewExportButton">미리보기</button>
+                  <button type="button" class="secondary-button" id="exportChapterButton">편집본 저장</button>
+                </div>
+              </section>
+              <section class="draft-action-group">
+                <div class="action-step">
+                  <span>4</span>
+                  <strong>파일</strong>
+                </div>
+                <div class="action-button-row">
+                  <button type="button" class="secondary-button" id="exportDocxButton">DOCX</button>
+                  <button type="button" class="secondary-button" id="exportPdfButton">PDF</button>
+                </div>
+              </section>
             </div>
             <div class="export-options">
               <label>
@@ -308,6 +338,13 @@
                 <span id="exportPreviewState" class="state-text">대기 중</span>
               </div>
               <div id="exportPreviewBody" class="review-output"></div>
+            </section>
+            <section class="export-preview" id="exportResult" hidden>
+              <div class="panel-heading review-heading">
+                <h3>파일 생성 결과</h3>
+                <span id="exportResultState" class="state-text">대기 중</span>
+              </div>
+              <div id="exportResultBody" class="review-output"></div>
             </section>
             <section class="review-panel" aria-live="polite">
               <div class="panel-heading review-heading">

@@ -49,7 +49,9 @@ async function main() {
     "id=\"deleteProjectButton\"",
     "id=\"chapterTemplate\"",
     "id=\"preflightChecklist\"",
+    "class=\"draft-workflow-actions\"",
     "id=\"previewExportButton\"",
+    "id=\"exportResult\"",
     "id=\"testObsidianButton\"",
     "id=\"retryLastButton\"",
   ]) {

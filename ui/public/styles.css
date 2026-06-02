@@ -651,11 +651,68 @@ select:focus {
   gap: 10px;
 }
 
-.draft-actions {
+.draft-workflow-actions {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: minmax(190px, 1.25fr) repeat(3, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.draft-action-group {
+  display: grid;
   gap: 10px;
-  margin-bottom: 12px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.draft-action-group.is-primary {
+  border-color: rgba(11, 111, 104, 0.34);
+  background: #eef7f4;
+}
+
+.action-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.action-step span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: #e9edf4;
+  color: var(--blue);
+}
+
+.draft-action-group.is-primary .action-step span {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.action-step strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.action-button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.draft-main-button {
+  min-height: 52px;
+  font-size: 15px;
 }
 
 .export-options,
@@ -1197,6 +1254,7 @@ summary {
   .compact-grid.wide,
   .import-grid,
   .preflight-list,
+  .draft-workflow-actions,
   .export-options,
   .settings-grid,
   .run-grid {
@@ -1233,7 +1291,8 @@ summary {
   .outline-item,
   .outline-item-actions,
   .actions,
-  .draft-actions,
+  .draft-workflow-actions,
+  .action-button-row,
   .version-toolbar,
   .version-diff-stats,
   .version-diff-row,
