@@ -25,12 +25,12 @@ npm start ui
 브라우저에서 `http://127.0.0.1:4173`을 엽니다.
 
 1. 책 프로젝트를 선택하거나 새로 만듭니다.
-2. 프로젝트 목록에서 검색, 정렬, 복제, 삭제로 책 단위 작업을 관리합니다.
+2. 프로젝트 목록에서 검색, 정렬, 복제, 삭제 복구, 최근 챕터 열기로 책 단위 작업을 관리합니다.
 3. 주간 기간, 챕터 브리프, 챕터 템플릿을 입력합니다.
 4. 아이디어, 경험, 사례, 예시, 개념, 메모를 원고 재료로 등록하고 이번 원고에 반영할 항목만 선택합니다.
-5. `초안 만들기`, `출판 정리`, `편집본 저장`, `미리보기`, `DOCX`, `PDF` 버튼으로 원고를 생성하고 내보냅니다.
+5. `초안 만들기`, `품질 점검`, `출판 정리`, `미리보기`, `Obsidian 저장`, `DOCX`, `PDF` 버튼 순서로 원고를 생성하고 내보냅니다.
 
-`LLM으로 출판용 확장`이 켜져 있고 `.env`에 OpenAI 또는 Azure OpenAI 설정이 있으면, 저장 직전에 LLM이 책 원고처럼 확장/재정리합니다.
+`LLM으로 출판용 확장`이 켜져 있고 `.env`에 OpenAI 또는 Azure OpenAI 설정이 있으면, 초안 생성과 출판 정리 단계에서 LLM이 책 원고처럼 확장/재정리합니다. 설정 화면의 `샘플 생성 테스트`로 키와 모델 연결을 짧은 문장 생성으로 확인할 수 있습니다.
 
 ```bash
 cp .env.example .env
@@ -53,6 +53,8 @@ Book Drafts/
     ├── 00_책 목차.md
     └── _versions/
 ```
+
+`Obsidian 저장` 버튼은 화면의 원고 편집본을 `<Vault>/<원고 저장 폴더>/<프로젝트명>/<챕터 제목>.md`에 저장합니다. `DOCX`와 `PDF`는 Obsidian이 아니라 `output/exports` 아래에 생성되고, 웹 UI의 파일 생성 결과에서 다운로드할 수 있습니다.
 
 ## 명령줄 사용
 
@@ -85,6 +87,12 @@ npm run test:smoke
 npm run test:ui
 ```
 
+Obsidian 저장, 원고 버전, 저장본 목록, 품질 점검, 출판 정리, DOCX/PDF 생성과 다운로드 URL은 다음 명령으로 실제 API 흐름을 점검할 수 있습니다. 이 테스트는 임시 Obsidian vault를 만들고 삭제하므로 사용자 vault를 수정하지 않습니다.
+
+```bash
+npm run test:api
+```
+
 ## Obsidian
 
 Obsidian 노트에 `#book-idea` 태그를 붙이거나 frontmatter에 `book_idea: true`를 넣으면 가져오기 대상이 됩니다. 기존 `#weekly-term`, `weekly_chapter: true`도 호환됩니다.
@@ -114,4 +122,4 @@ python3 scripts/import_obsidian.py \
   --project-id default
 ```
 
-UI에서는 `Obsidian 원고함`을 펼쳐 vault 경로, 가져올 폴더, 저장 폴더를 설정할 수 있습니다.
+UI에서는 `설정 > Obsidian 원고함`에서 vault 경로, 가져올 폴더, 저장 폴더를 설정할 수 있습니다. `감지 경로 적용`은 로컬 Obsidian 설정에서 열린 vault를 입력칸에 넣고, `연결 테스트`는 가져오기 폴더와 원고 저장 위치를 확인합니다.

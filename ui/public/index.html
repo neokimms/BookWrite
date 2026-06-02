@@ -64,6 +64,18 @@
                 <button type="button" class="ghost-button danger-action" id="deleteProjectButton">삭제</button>
                 <button type="button" class="primary-button" id="openWritingButton">원고 작성</button>
               </div>
+              <section class="project-focus wide-field" aria-live="polite">
+                <div>
+                  <span>최근 챕터</span>
+                  <strong id="projectRecentChapter">아직 등록된 챕터 없음</strong>
+                  <small id="projectRecentMeta">목차에 챕터를 추가하면 바로 이어서 작업할 수 있습니다.</small>
+                </div>
+                <button type="button" class="secondary-button compact-button" id="openRecentChapterButton">최근 챕터 열기</button>
+              </section>
+              <div class="project-undo wide-field" id="projectUndoBar" hidden>
+                <span id="projectUndoText">삭제한 프로젝트를 복구할 수 있습니다.</span>
+                <button type="button" class="ghost-button compact-button" id="undoProjectDeleteButton">삭제 복구</button>
+              </div>
             </div>
           </section>
 
@@ -472,13 +484,25 @@
               <span>LLM 모델</span>
               <input id="llmModel" type="text" autocomplete="off" placeholder="gpt-4.1-mini" />
             </label>
+            <button type="button" class="secondary-button" id="testLlmButton">샘플 생성 테스트</button>
           </div>
+          <div class="llm-sample" id="llmSampleOutput">샘플 생성 결과가 여기에 표시됩니다.</div>
         </section>
 
         <section class="panel import-panel">
           <div class="panel-heading">
             <h2>Obsidian 원고함</h2>
             <span id="obsidianConnectionNote" class="connection-note">Obsidian 연결 상태를 확인 중입니다.</span>
+          </div>
+          <div class="obsidian-status-grid" aria-live="polite">
+            <div>
+              <span>가져오기 경로</span>
+              <strong id="obsidianReadState">확인 대기</strong>
+            </div>
+            <div>
+              <span>원고 저장 경로</span>
+              <strong id="obsidianWriteState">확인 대기</strong>
+            </div>
           </div>
           <form id="obsidianForm" class="import-grid">
             <label>
@@ -504,6 +528,7 @@
             <div class="save-preview" id="obsidianSavePreview">저장 위치 미리보기 대기</div>
             <div class="actions import-actions">
               <button type="button" class="ghost-button" id="useExample">예시 경로</button>
+              <button type="button" class="secondary-button" id="applyDetectedVaultButton">감지 경로 적용</button>
               <button type="button" class="secondary-button" id="testObsidianButton">연결 테스트</button>
               <button type="submit" class="secondary-button" id="importButton">가져오기</button>
               <button type="button" class="secondary-button" id="exportChapterPanelButton">Obsidian 저장</button>

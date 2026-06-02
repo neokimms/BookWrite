@@ -244,6 +244,56 @@ h3 {
   gap: 10px;
 }
 
+.project-focus {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 12px;
+}
+
+.project-focus span,
+.project-focus small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.project-focus strong {
+  display: block;
+  margin: 5px 0;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.project-undo {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid rgba(166, 99, 24, 0.34);
+  border-radius: 8px;
+  background: #fff8ed;
+  color: var(--amber);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.project-undo[hidden] {
+  display: none;
+}
+
 .project-list-panel {
   padding: 16px;
 }
@@ -895,7 +945,46 @@ summary {
 }
 
 .import-actions {
-  grid-template-columns: 0.9fr 1fr 1fr 1fr;
+  grid-template-columns: 0.9fr 1fr 1fr 1fr 1fr;
+}
+
+.obsidian-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.obsidian-status-grid > div,
+.llm-sample {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px 12px;
+}
+
+.obsidian-status-grid span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.obsidian-status-grid strong {
+  display: block;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.llm-sample {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .save-preview {
@@ -1289,6 +1378,8 @@ summary {
   .style-guide-grid,
   .compact-grid,
   .project-actions,
+  .project-focus,
+  .project-undo,
   .project-list-tools,
   .outline-actions,
   .outline-item,
@@ -1300,7 +1391,8 @@ summary {
   .version-diff-stats,
   .version-diff-row,
   .material-form-actions,
-  .type-selector {
+  .type-selector,
+  .obsidian-status-grid {
     grid-template-columns: 1fr;
   }
 

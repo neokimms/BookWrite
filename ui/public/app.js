@@ -11,6 +11,12 @@ const saveProjectButton = document.querySelector("#saveProjectButton");
 const duplicateProjectButton = document.querySelector("#duplicateProjectButton");
 const deleteProjectButton = document.querySelector("#deleteProjectButton");
 const openWritingButton = document.querySelector("#openWritingButton");
+const openRecentChapterButton = document.querySelector("#openRecentChapterButton");
+const projectRecentChapter = document.querySelector("#projectRecentChapter");
+const projectRecentMeta = document.querySelector("#projectRecentMeta");
+const projectUndoBar = document.querySelector("#projectUndoBar");
+const projectUndoText = document.querySelector("#projectUndoText");
+const undoProjectDeleteButton = document.querySelector("#undoProjectDeleteButton");
 const projectState = document.querySelector("#projectState");
 const projectListCount = document.querySelector("#projectListCount");
 const projectCards = document.querySelector("#projectCards");
@@ -69,9 +75,14 @@ const obsidianCount = document.querySelector("#obsidianCount");
 const obsidianConnectionStatus = document.querySelector("#obsidianConnectionStatus");
 const obsidianConnectionNote = document.querySelector("#obsidianConnectionNote");
 const obsidianSavePreview = document.querySelector("#obsidianSavePreview");
+const obsidianReadState = document.querySelector("#obsidianReadState");
+const obsidianWriteState = document.querySelector("#obsidianWriteState");
 const testObsidianButton = document.querySelector("#testObsidianButton");
+const applyDetectedVaultButton = document.querySelector("#applyDetectedVaultButton");
 const llmConnectionStatus = document.querySelector("#llmConnectionStatus");
 const llmConnectionNote = document.querySelector("#llmConnectionNote");
+const testLlmButton = document.querySelector("#testLlmButton");
+const llmSampleOutput = document.querySelector("#llmSampleOutput");
 const busyIndicator = document.querySelector("#busyIndicator");
 const entryCount = document.querySelector("#entryCount");
 const entryList = document.querySelector("#entryList");
@@ -111,6 +122,7 @@ const versionDiff = document.querySelector("#versionDiff");
 
 const STORAGE_KEY = "book-writing-agent-ui";
 const BOOK_PROJECTS_STORAGE_KEY = "book-writing-agent-projects";
+const PROJECT_DELETE_UNDO_STORAGE_KEY = "book-writing-agent-project-delete-undo";
 const DRAFT_VERSION_STORAGE_KEY = "book-writing-agent-draft-versions";
 const BOOK_OUTLINE_STORAGE_KEY = "book-writing-agent-book-outline";
 const ENTRY_INCLUSION_STORAGE_KEY = "book-writing-agent-entry-inclusion";
@@ -166,6 +178,7 @@ let projectSearchTerm = "";
 let projectSortMode = "updated-desc";
 let lastRetryAction = null;
 let statusErrorShown = false;
+let detectedVaultPath = "";
 
 const writingExample = {
   type: "case",
@@ -213,11 +226,15 @@ function setBusy(isBusy) {
   duplicateProjectButton.disabled = isBusy;
   deleteProjectButton.disabled = isBusy;
   openWritingButton.disabled = isBusy;
+  openRecentChapterButton.disabled = isBusy;
+  undoProjectDeleteButton.disabled = isBusy;
   addCurrentChapterButton.disabled = isBusy;
   exportOutlineButton.disabled = isBusy;
   loadObsidianVersionsButton.disabled = isBusy;
   loadSavedDraftsButton.disabled = isBusy;
   retryLastButton.disabled = isBusy || !lastRetryAction;
+  applyDetectedVaultButton.disabled = isBusy;
+  testLlmButton.disabled = isBusy;
   busyIndicator.textContent = isBusy ? "작업 중" : "대기";
   document.body.classList.toggle("is-busy", isBusy);
   renderDraftVersions();
@@ -446,6 +463,48 @@ function renderProjectCards(projects = loadProjects()) {
   projectCards.innerHTML = cards.map(projectCardHtml).join("");
 }
 
+function latestOutlineItem(project) {
+  const outline = project.id === activeProjectId ? loadBookOutline() : Array.isArray(project.outline) ? project.outline : [];
+  return outline
+    .slice()
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0] || null;
+}
+
+function renderProjectFocus(project) {
+  const latest = latestOutlineItem(project);
+  if (!latest) {
+    projectRecentChapter.textContent = "아직 등록된 챕터 없음";
+    projectRecentMeta.textContent = "목차에 챕터를 추가하면 바로 이어서 작업할 수 있습니다.";
+    openRecentChapterButton.textContent = "원고 작성";
+    return;
+  }
+
+  const period = [latest.weekStart, latest.weekEnd].filter(Boolean).join(" - ") || "기간 미정";
+  const updatedAt = latest.updatedAt ? new Date(latest.updatedAt) : null;
+  const updatedText = updatedAt && !Number.isNaN(updatedAt.valueOf()) ? updatedAt.toLocaleString() : "수정일 없음";
+  const status = latest.status === "draft" ? "초안 있음" : "브리프";
+  projectRecentChapter.textContent = latest.title || "제목 없음";
+  projectRecentMeta.textContent = `${period} · ${status} · ${updatedText}`;
+  openRecentChapterButton.textContent = "최근 챕터 열기";
+}
+
+function deletedProjectBackup() {
+  const backup = readStoredJson(PROJECT_DELETE_UNDO_STORAGE_KEY, null);
+  return backup?.project?.id ? backup : null;
+}
+
+function renderProjectUndo() {
+  const backup = deletedProjectBackup();
+  projectUndoBar.hidden = !backup;
+  if (!backup) {
+    return;
+  }
+
+  const deletedAt = backup.deletedAt ? new Date(backup.deletedAt) : null;
+  const when = deletedAt && !Number.isNaN(deletedAt.valueOf()) ? deletedAt.toLocaleString() : "방금";
+  projectUndoText.textContent = `${backup.project.name || "삭제한 프로젝트"} 삭제됨 · ${when}`;
+}
+
 function renderProjects(projects = loadProjects()) {
   const currentProject = activeProject(projects);
   activeProjectId = currentProject.id;
@@ -456,6 +515,8 @@ function renderProjects(projects = loadProjects()) {
   projectNameInput.value = currentProject.name || defaults.projectName;
   bookTitleInput.value = currentProject.bookTitle || currentProject.form?.bookTitle || "";
   setProjectState(`${projects.length}개 프로젝트`);
+  renderProjectFocus(currentProject);
+  renderProjectUndo();
   renderProjectCards(projects);
 }
 
@@ -624,6 +685,63 @@ function duplicateProject(projectId = activeProjectId) {
   writeLog(`책 프로젝트를 복제했습니다: ${newName}`);
 }
 
+function cacheDeletedProject(project) {
+  localStorage.setItem(
+    PROJECT_DELETE_UNDO_STORAGE_KEY,
+    JSON.stringify({
+      project,
+      deletedAt: new Date().toISOString(),
+    }),
+  );
+  renderProjectUndo();
+}
+
+function restoreDeletedProject() {
+  const backup = deletedProjectBackup();
+  if (!backup) {
+    writeLog("복구할 삭제 프로젝트가 없습니다.");
+    renderProjectUndo();
+    return;
+  }
+
+  const projects = loadProjects();
+  const restoredProject = {
+    ...backup.project,
+    updatedAt: new Date().toISOString(),
+  };
+  if (projects.some((project) => project.id === restoredProject.id)) {
+    restoredProject.id = makeProjectId();
+    restoredProject.name = `${restoredProject.name || defaults.projectName} 복구본`;
+    restoredProject.form = {
+      ...(restoredProject.form || {}),
+      activeProjectId: restoredProject.id,
+      projectName: restoredProject.name,
+    };
+    restoredProject.outline = Array.isArray(restoredProject.outline)
+      ? restoredProject.outline.map((item) => ({ ...item, projectId: restoredProject.id, projectName: restoredProject.name }))
+      : [];
+  }
+
+  projects.push(restoredProject);
+  activeProjectId = restoredProject.id;
+  saveProjects(projects);
+  localStorage.setItem(scopedStorageKey(BOOK_OUTLINE_STORAGE_KEY), JSON.stringify(restoredProject.outline || []));
+  localStorage.removeItem(PROJECT_DELETE_UNDO_STORAGE_KEY);
+  isApplyingProject = true;
+  renderProjects(projects);
+  applyFormSnapshot({
+    ...restoredProject.form,
+    projectName: restoredProject.name,
+    bookTitle: restoredProject.bookTitle || restoredProject.form?.bookTitle || "",
+  });
+  isApplyingProject = false;
+  persistForm();
+  renderBookOutline();
+  loadStatus();
+  setProjectState("복구됨");
+  writeLog(`삭제한 책 프로젝트를 복구했습니다: ${restoredProject.name || "이름 없음"}`);
+}
+
 function deleteProject(projectId = activeProjectId) {
   const projects = loadProjects();
   const target = projects.find((project) => project.id === projectId);
@@ -640,6 +758,10 @@ function deleteProject(projectId = activeProjectId) {
     return;
   }
 
+  cacheDeletedProject({
+    ...target,
+    outline: target.id === activeProjectId ? loadBookOutline() : target.outline || [],
+  });
   const nextProjects = projects.filter((project) => project.id !== projectId);
   if (projectId === activeProjectId) {
     activeProjectId = nextProjects[0]?.id || "default";
@@ -697,6 +819,17 @@ function openWritingView() {
   showView("writing");
 }
 
+function openRecentChapter() {
+  const project = activeProject();
+  const latest = latestOutlineItem(project);
+  if (latest) {
+    loadOutlineItem(latest);
+  } else {
+    writeLog("최근 챕터가 아직 없어 새 원고 작성 화면으로 이동합니다.");
+  }
+  showView("writing");
+}
+
 function handleProjectCardAction(event) {
   const button = event.target.closest("[data-project-action]");
   if (!button) {
@@ -734,6 +867,7 @@ function loadBookOutline() {
 function saveBookOutline(outline) {
   localStorage.setItem(scopedStorageKey(BOOK_OUTLINE_STORAGE_KEY), JSON.stringify(outline));
   saveActiveProject({ silent: true });
+  renderProjectFocus(activeProject());
   renderProjectCards(loadProjects());
 }
 
@@ -1562,12 +1696,17 @@ function renderObsidianConnection(connection) {
   if (!connection) {
     obsidianConnectionStatus.textContent = "Obsidian 미확인";
     obsidianConnectionNote.textContent = "Obsidian 연결 상태를 아직 확인하지 못했습니다.";
+    obsidianReadState.textContent = "확인 대기";
+    obsidianWriteState.textContent = "확인 대기";
     return;
   }
 
   if (connection.connected && connection.defaultVaultPath) {
+    detectedVaultPath = connection.defaultVaultPath;
     obsidianConnectionStatus.textContent = "Obsidian 연결됨";
     obsidianConnectionNote.textContent = `연결된 vault: ${connection.defaultVaultPath}`;
+    obsidianReadState.textContent = "Vault 자동 감지됨";
+    obsidianWriteState.textContent = "저장 경로 미리보기 가능";
     if (!vaultInput.value.trim()) {
       vaultInput.value = connection.defaultVaultPath;
       persistForm();
@@ -1578,11 +1717,15 @@ function renderObsidianConnection(connection) {
   if (connection.installed) {
     obsidianConnectionStatus.textContent = "Obsidian 경로 필요";
     obsidianConnectionNote.textContent = "Obsidian은 설치되어 있지만 연결된 vault를 찾지 못했습니다.";
+    obsidianReadState.textContent = "Vault 경로 필요";
+    obsidianWriteState.textContent = "Vault 확인 후 저장 가능";
     return;
   }
 
   obsidianConnectionStatus.textContent = "Obsidian 미설치";
   obsidianConnectionNote.textContent = "이 PC에서 Obsidian 앱을 찾지 못했습니다.";
+  obsidianReadState.textContent = "앱 확인 필요";
+  obsidianWriteState.textContent = "앱 확인 필요";
 }
 
 function safePreviewName(value) {
@@ -1596,6 +1739,7 @@ function safePreviewName(value) {
 function updateObsidianPreview(check = null) {
   if (check?.savePreview) {
     obsidianSavePreview.textContent = `저장 위치: ${check.savePreview}`;
+    obsidianWriteState.textContent = check.vaultExists ? "저장 위치 확인됨" : "Vault 확인 필요";
     return;
   }
   const vault = vaultInput.value.trim() || "(자동 감지 vault)";
@@ -1603,9 +1747,11 @@ function updateObsidianPreview(check = null) {
   const project = safePreviewName(projectNameInput.value || bookTitleInput.value || activeProjectId);
   const title = safePreviewName(chapterTitleInput.value || "챕터 제목");
   obsidianSavePreview.textContent = `저장 위치 미리보기: ${vault}/${folder}/${project}/${title}.md`;
+  obsidianWriteState.textContent = vaultInput.value.trim() ? "저장 위치 미리보기" : "자동 감지 대기";
 }
 
 function renderObsidianCheck(data) {
+  detectedVaultPath = data.obsidianConnection?.defaultVaultPath || detectedVaultPath;
   const parts = [];
   if (data.vaultPath) {
     parts.push(data.vaultExists ? `Vault 확인: ${data.vaultPath}` : `Vault 없음: ${data.vaultPath}`);
@@ -1620,7 +1766,27 @@ function renderObsidianCheck(data) {
   }
   obsidianConnectionNote.textContent = parts.join(" · ");
   obsidianConnectionStatus.textContent = data.connected ? "Obsidian 연결됨" : "Obsidian 확인 필요";
+  obsidianReadState.textContent = data.importFolder
+    ? data.importFolderExists ? "가져오기 폴더 확인됨" : "가져오기 폴더 확인 필요"
+    : data.vaultExists ? "Vault 확인됨" : "Vault 확인 필요";
+  obsidianWriteState.textContent = data.savePreview
+    ? data.vaultExists ? "원고 저장 가능" : "Vault 확인 필요"
+    : "저장 경로 확인 필요";
   updateObsidianPreview(data);
+}
+
+function applyDetectedVault() {
+  const vaultPath = detectedVaultPath || vaultInput.value.trim();
+  if (!vaultPath) {
+    writeLog("자동 감지된 Obsidian vault가 없습니다. Vault 경로를 직접 입력해 주세요.");
+    obsidianReadState.textContent = "Vault 경로 필요";
+    return;
+  }
+
+  vaultInput.value = vaultPath;
+  persistForm();
+  updateObsidianPreview();
+  writeLog(`감지된 Obsidian vault 경로를 적용했습니다: ${vaultPath}`);
 }
 
 async function testObsidianConnection() {
@@ -1635,6 +1801,29 @@ async function testObsidianConnection() {
   } catch (error) {
     obsidianConnectionStatus.textContent = "Obsidian 확인 필요";
     obsidianConnectionNote.textContent = error.message;
+    writeLog(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function testLlmSample() {
+  persistForm();
+  setBusy(true);
+  llmSampleOutput.textContent = "샘플 원고 문장을 생성하는 중...";
+  writeLog("LLM 샘플 생성을 테스트하는 중...");
+  try {
+    const data = await requestJson("/api/test-llm", {
+      ...commonPayload(),
+      llmModel: llmModelInput.value.trim(),
+    });
+    renderLlmConnection(data.llmConnection);
+    renderLastRun(data.lastRun);
+    llmSampleOutput.textContent = data.sample || "샘플 응답이 비어 있습니다.";
+    writeLog(data.lastRun?.message || "LLM 샘플 생성을 완료했습니다.");
+  } catch (error) {
+    llmConnectionStatus.textContent = "LLM 확인 필요";
+    llmSampleOutput.textContent = error.message;
     writeLog(error.message);
   } finally {
     setBusy(false);
@@ -2006,6 +2195,7 @@ function renderLastRun(lastRun) {
     "list-saved-drafts": "Obsidian 저장본 목록",
     "polish-draft": "출판 원고 정리",
     "review-draft": "원고 품질 점검",
+    "test-llm": "LLM 샘플 테스트",
     "update-idea": "재료 수정",
   };
   const statusLabel = lastRun.status === "success" ? "완료" : "확인 필요";
@@ -2361,6 +2551,8 @@ saveProjectButton.addEventListener("click", () => saveActiveProject());
 duplicateProjectButton.addEventListener("click", () => duplicateProject());
 deleteProjectButton.addEventListener("click", () => deleteProject());
 openWritingButton.addEventListener("click", openWritingView);
+openRecentChapterButton.addEventListener("click", openRecentChapter);
+undoProjectDeleteButton.addEventListener("click", restoreDeletedProject);
 projectCards.addEventListener("click", handleProjectCardAction);
 projectSearchInput.addEventListener("input", () => {
   projectSearchTerm = projectSearchInput.value;
@@ -2392,6 +2584,8 @@ cancelEditButton.addEventListener("click", () => {
 loadWritingExample.addEventListener("click", fillWritingExample);
 previewExportButton.addEventListener("click", renderExportPreview);
 testObsidianButton.addEventListener("click", testObsidianConnection);
+applyDetectedVaultButton.addEventListener("click", applyDetectedVault);
+testLlmButton.addEventListener("click", testLlmSample);
 retryLastButton.addEventListener("click", retryLastAction);
 thisWeekButton.addEventListener("click", () => {
   setDefaultWeek();
@@ -2407,6 +2601,7 @@ useExample.addEventListener("click", () => {
   tagsInput.value = "book-idea";
   chapterFolderInput.value = "Book Drafts";
   persistForm();
+  updateObsidianPreview();
 });
 loadSavedDraftsButton.addEventListener("click", loadSavedDrafts);
 savedDraftList.addEventListener("click", handleSavedDraftAction);
@@ -2429,6 +2624,7 @@ for (const input of document.querySelectorAll("input, textarea, select")) {
         bookTitleInput,
         chapterNumberInput,
         vaultInput,
+        folderInput,
         chapterFolderInput,
       ].includes(input)
     ) {

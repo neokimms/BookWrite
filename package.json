@@ -9,6 +9,7 @@
     "prompt": "python3 scripts/build_prompt.py --input data/weekly_terms.csv --out output/book-draft-prompt.md",
     "import:obsidian": "python3 scripts/import_obsidian.py",
     "test:smoke": "python3 scripts/smoke_test.py",
-    "test:ui": "node scripts/ui_smoke_test.js"
+    "test:ui": "node scripts/ui_smoke_test.js",
+    "test:api": "node scripts/api_quality_test.js"
   }
 }

@@ -1141,6 +1141,57 @@ function llmConnectionStatus() {
   };
 }
 
+async function testLlmSample(payload = {}) {
+  if (!LLM_API_KEY) {
+    throw new Error("LLM API 키가 설정되어 있지 않습니다. .env의 OPENAI_API_KEY 또는 AZURE_OPENAI_API_KEY를 확인해 주세요.");
+  }
+
+  const systemPrompt = "당신은 한국어 책 원고를 쓰는 작가 에이전트입니다. 과장 없이 짧고 구체적으로 답합니다.";
+  const userPrompt = [
+    "아래 책쓰기 맥락을 바탕으로 챕터 도입문 예시를 2문장만 작성하세요.",
+    `책의 맥락: ${payload.bookContext || "사용자의 아이디어를 책 원고로 확장한다."}`,
+    `예상 독자: ${payload.targetReader || "실무 경험을 글로 정리하고 싶은 독자"}`,
+    `이번 원고 목표: ${payload.chapterGoal || "하나의 사례를 책에 넣을 수 있는 문장으로 만든다."}`,
+    `톤: ${payload.tone || "단정하고 자연스러운 책 원고"}`,
+  ].join("\n");
+
+  const response = await fetch(llmRequestUrl(), {
+    method: "POST",
+    headers: llmRequestHeaders(),
+    body: JSON.stringify({
+      model: llmModel(payload),
+      input: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_output_tokens: 260,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data.error?.message || `LLM request failed with HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  const sample = stripMarkdownFence(extractResponseText(data));
+  if (!sample) {
+    throw new Error("LLM 응답에서 샘플 문장을 찾지 못했습니다.");
+  }
+
+  const lastRun = writeRunState({
+    action: "test-llm",
+    status: "success",
+    message: `LLM 샘플 생성을 완료했습니다. provider=${USE_AZURE_OPENAI ? "azure-openai" : "openai"}, model=${llmModel(payload)}`,
+  });
+
+  return {
+    sample,
+    llmConnection: llmConnectionStatus(),
+    lastRun,
+  };
+}
+
 async function expandChapterWithLlm(markdown, entries, payload) {
   if (payload.expandWithLlm === false) {
     return {
@@ -2300,6 +2351,18 @@ async function handleApi(request, response) {
         ok: true,
         ...getStatus(payload.projectId),
         ...checkObsidianSettings(payload),
+        entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
+      });
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/test-llm") {
+      const payload = await readJson(request);
+      const result = await testLlmSample(payload);
+      sendJson(response, 200, {
+        ok: true,
+        ...getStatus(payload.projectId),
+        ...result,
         entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
       });
       return;
