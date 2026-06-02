@@ -653,19 +653,22 @@ select:focus {
 
 .draft-workflow-actions {
   display: grid;
-  grid-template-columns: minmax(190px, 1.25fr) repeat(3, minmax(170px, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
 .draft-action-group {
   display: grid;
+  grid-template-columns: minmax(130px, 0.36fr) minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
   min-width: 0;
+  min-height: 68px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface-soft);
-  padding: 12px;
+  padding: 10px 12px;
 }
 
 .draft-action-group.is-primary {
@@ -711,7 +714,7 @@ select:focus {
 }
 
 .draft-main-button {
-  min-height: 52px;
+  min-height: 42px;
   font-size: 15px;
 }
 
@@ -1291,7 +1294,7 @@ summary {
   .outline-item,
   .outline-item-actions,
   .actions,
-  .draft-workflow-actions,
+  .draft-action-group,
   .action-button-row,
   .version-toolbar,
   .version-diff-stats,

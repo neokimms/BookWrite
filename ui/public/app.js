@@ -1754,7 +1754,7 @@ function renderDraft(data) {
   const entryCountText = `${(data.entries || []).length}개 재료`;
   const statusLabels = {
     disabled: "구조 초안",
-    edited: "편집본 저장됨",
+    edited: "Obsidian 저장됨",
     expanded: "AI 확장 완료",
     polished: "출판 정리 완료",
     skipped: "구조 초안",
@@ -2299,7 +2299,7 @@ async function polishDraft() {
 }
 
 async function exportChapter() {
-  setRetryAction("편집본 저장", exportChapter);
+  setRetryAction("Obsidian 저장", exportChapter);
   persistForm();
   setBusy(true);
   setDraftState("저장 중");
