@@ -49,7 +49,12 @@ async function main() {
     "id=\"deleteProjectButton\"",
     "id=\"openRecentChapterButton\"",
     "id=\"undoProjectDeleteButton\"",
+    "id=\"exportProjectBackupButton\"",
+    "id=\"importProjectBackupButton\"",
     "id=\"chapterTemplate\"",
+    "id=\"advancedBrief\"",
+    "id=\"writingProjectContext\"",
+    "id=\"entryRangeLabel\"",
     "id=\"preflightChecklist\"",
     "class=\"draft-workflow-actions\"",
     "id=\"previewExportButton\"",
@@ -59,6 +64,9 @@ async function main() {
     "id=\"obsidianWriteState\"",
     "id=\"applyDetectedVaultButton\"",
     "id=\"testObsidianButton\"",
+    "저장 경로 확인",
+    "id=\"runOpsCheckButton\"",
+    "id=\"opsCheckList\"",
     "id=\"retryLastButton\"",
   ]) {
     assertIncludes(html, marker);
@@ -95,6 +103,24 @@ async function main() {
     });
     assert(obsidian.vaultExists, "example vault path should exist");
     assert(obsidian.savePreview.includes("테스트 챕터.md"), "save preview should include chapter file name");
+
+    const ops = await jsonFetch(`${BASE_URL}/api/operational-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: "default",
+        projectName: "UI Smoke",
+        chapterTitle: "테스트 챕터",
+        weekStart: "2026-06-01",
+        weekEnd: "2026-06-07",
+        vault: "examples/obsidian-vault",
+        folder: "Weekly Terms",
+        chapterFolder: "Book Drafts",
+        markdown: "# 테스트 챕터\n\n## 도입\n\n운영 점검 테스트용 원고입니다.",
+      }),
+    });
+    assert(Array.isArray(ops.checks), "operational check should return checks");
+    assert(ops.checks.some((check) => check.label === "Obsidian 연결"), "ops checks should include Obsidian");
   } finally {
     child.kill("SIGTERM");
   }

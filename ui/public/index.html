@@ -64,6 +64,11 @@
                 <button type="button" class="ghost-button danger-action" id="deleteProjectButton">삭제</button>
                 <button type="button" class="primary-button" id="openWritingButton">원고 작성</button>
               </div>
+              <div class="project-backup-actions wide-field">
+                <button type="button" class="secondary-button" id="exportProjectBackupButton">프로젝트 백업</button>
+                <button type="button" class="secondary-button" id="importProjectBackupButton">백업 복원</button>
+                <input id="projectBackupFile" type="file" accept="application/json,.json" hidden />
+              </div>
               <section class="project-focus wide-field" aria-live="polite">
                 <div>
                   <span>최근 챕터</span>
@@ -105,26 +110,36 @@
 
       <section class="workspace-view" id="writingView" data-view-panel="writing" hidden>
         <section class="workflow-strip" aria-label="작업 흐름">
-          <div class="workflow-step is-active">
+          <div class="workflow-step is-active" data-workflow-step="brief">
             <span>1</span>
             <strong>챕터 브리프</strong>
           </div>
-          <div class="workflow-step">
+          <div class="workflow-step" data-workflow-step="materials">
             <span>2</span>
             <strong>재료 모으기</strong>
           </div>
-          <div class="workflow-step">
+          <div class="workflow-step" data-workflow-step="draft">
             <span>3</span>
             <strong>초안 저장</strong>
           </div>
         </section>
 
+        <section class="writing-context-bar" aria-live="polite">
+          <span>현재 프로젝트</span>
+          <strong id="writingProjectContext">프로젝트 확인 중</strong>
+        </section>
+
         <section class="panel brief-panel">
           <div class="panel-heading">
-            <h2>이번 챕터 브리프</h2>
-            <button type="button" class="secondary-button compact-button" id="thisWeekButton">이번 주</button>
+            <div>
+              <h2>이번 챕터 브리프</h2>
+              <span id="briefRequiredState" class="subtle-heading-note">챕터 제목과 기간만 먼저 입력해도 시작할 수 있습니다.</span>
+            </div>
+            <div class="heading-actions">
+              <button type="button" class="secondary-button compact-button" id="thisWeekButton">이번 주</button>
+            </div>
           </div>
-          <div class="brief-grid">
+          <div class="brief-grid essential-brief-grid">
             <label>
               <span>시작일</span>
               <input id="weekStart" type="date" />
@@ -137,6 +152,10 @@
               <span>챕터 제목</span>
               <input id="chapterTitle" type="text" autocomplete="off" placeholder="예: 요구사항은 기능명이 아니라 장면에서 시작된다" />
             </label>
+          </div>
+          <details class="advanced-brief" id="advancedBrief">
+            <summary>심화 설정</summary>
+            <div class="brief-grid advanced-brief-grid">
             <label>
               <span>원고 유형</span>
               <select id="draftType">
@@ -175,7 +194,8 @@
               <input id="expandWithLlm" type="checkbox" checked />
               <span>AI로 출판용 확장</span>
             </label>
-          </div>
+            </div>
+          </details>
         </section>
 
         <section class="panel preflight-panel" aria-live="polite">
@@ -273,14 +293,17 @@
 
             <section class="panel list-panel">
               <div class="panel-heading">
-                <h2>이번 주 재료</h2>
-                <span id="entryCount" class="state-text">0개</span>
+                <div>
+                  <h2>이번 주 재료</h2>
+                  <span id="entryRangeLabel" class="subtle-heading-note">날짜 범위를 확인 중입니다.</span>
+                </div>
+                <span id="entryCount" class="state-text">0개 선택</span>
               </div>
               <div id="entryList" class="entry-list"></div>
             </section>
           </section>
 
-          <section class="panel draft-panel">
+          <section class="panel draft-panel is-empty">
             <div class="panel-heading">
               <h2>원고 초안 편집</h2>
               <span id="draftState" class="state-text">대기 중</span>
@@ -449,6 +472,17 @@
       </section>
 
       <section class="workspace-view" id="settingsView" data-view-panel="settings" hidden>
+        <section class="panel ops-panel" aria-live="polite">
+          <div class="panel-heading">
+            <h2>운영 검증</h2>
+            <div class="heading-actions">
+              <span id="opsState" class="state-text">점검 대기</span>
+              <button type="button" class="secondary-button compact-button" id="runOpsCheckButton">운영 점검</button>
+            </div>
+          </div>
+          <div id="opsCheckList" class="ops-check-list"></div>
+        </section>
+
         <section class="panel style-guide-panel">
           <div class="panel-heading">
             <h2>작가 스타일 가이드</h2>
@@ -531,7 +565,7 @@
               <button type="button" class="secondary-button" id="applyDetectedVaultButton">감지 경로 적용</button>
               <button type="button" class="secondary-button" id="testObsidianButton">연결 테스트</button>
               <button type="submit" class="secondary-button" id="importButton">가져오기</button>
-              <button type="button" class="secondary-button" id="exportChapterPanelButton">Obsidian 저장</button>
+              <button type="button" class="secondary-button" id="exportChapterPanelButton">저장 경로 확인</button>
             </div>
           </form>
         </section>

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install export tools
+        run: brew install pandoc
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check ui/public/app.js
+          node --check ui/server.js
+          node --check scripts/ui_smoke_test.js
+          node --check scripts/api_quality_test.js
+          node --check scripts/operational_rehearsal_test.js
+
+      - name: Check Python syntax
+        run: python3 -m py_compile scripts/npm_start.py scripts/build_prompt.py scripts/import_obsidian.py scripts/smoke_test.py
+
+      - name: Smoke test
+        run: npm run test:smoke
+
+      - name: UI smoke test
+        run: npm run test:ui
+
+      - name: API quality test
+        run: npm run test:api
+
+      - name: Operational rehearsal
+        run: npm run test:ops

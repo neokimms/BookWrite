@@ -10,6 +10,7 @@
     "import:obsidian": "python3 scripts/import_obsidian.py",
     "test:smoke": "python3 scripts/smoke_test.py",
     "test:ui": "node scripts/ui_smoke_test.js",
-    "test:api": "node scripts/api_quality_test.js"
+    "test:api": "node scripts/api_quality_test.js",
+    "test:ops": "node scripts/operational_rehearsal_test.js"
   }
 }

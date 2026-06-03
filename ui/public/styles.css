@@ -167,6 +167,33 @@ h3 {
   display: none;
 }
 
+.writing-context-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 11px 13px;
+}
+
+.writing-context-bar span,
+.subtle-heading-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.writing-context-bar strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .workflow-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -209,6 +236,17 @@ h3 {
   color: #ffffff;
 }
 
+.workflow-step.is-complete {
+  border-color: rgba(49, 95, 146, 0.26);
+  background: #f3f7fb;
+  color: var(--blue);
+}
+
+.workflow-step.is-complete span {
+  background: var(--blue);
+  color: #ffffff;
+}
+
 .brief-panel {
   margin-bottom: 0;
   padding: 16px;
@@ -241,6 +279,13 @@ h3 {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-backup-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -521,6 +566,30 @@ h3 {
   align-items: end;
 }
 
+.essential-brief-grid {
+  grid-template-columns: minmax(130px, 0.7fr) minmax(130px, 0.7fr) minmax(260px, 2fr);
+}
+
+.advanced-brief {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 0;
+}
+
+.advanced-brief summary {
+  min-height: 42px;
+  padding: 11px 12px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.advanced-brief-grid {
+  padding: 0 12px 12px;
+}
+
 .wide-field {
   grid-column: span 2;
 }
@@ -548,6 +617,7 @@ h3 {
 .output-panel,
 .import-panel,
 .llm-panel,
+.ops-panel,
 .settings-panel,
 .run-panel {
   padding: 16px;
@@ -1004,6 +1074,62 @@ summary {
   padding: 16px;
 }
 
+.ops-check-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ops-check-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px;
+}
+
+.ops-check-item.is-ok {
+  border-color: rgba(11, 111, 104, 0.34);
+  background: #eef7f4;
+}
+
+.ops-check-item.is-warn {
+  border-color: rgba(166, 99, 24, 0.34);
+  background: #fff8ed;
+}
+
+.ops-check-item.is-error {
+  border-color: rgba(162, 59, 48, 0.34);
+  background: #fff0ee;
+}
+
+.ops-check-item strong,
+.ops-check-item span,
+.ops-check-item small {
+  display: block;
+}
+
+.ops-check-item strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.ops-check-item span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.ops-check-item small {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .saved-drafts-heading {
   display: flex;
   align-items: center;
@@ -1052,6 +1178,23 @@ summary {
   background: #fbfcfa;
   line-height: 1.62;
   white-space: pre-wrap;
+}
+
+.draft-panel.is-empty .draft-action-group:not(.is-primary),
+.draft-panel.is-empty .export-options {
+  display: none;
+}
+
+.draft-panel.is-empty #draftPreview {
+  min-height: 360px;
+}
+
+.draft-panel.has-draft #draftPreview {
+  min-height: 760px;
+}
+
+.draft-panel.has-draft .draft-workflow-actions {
+  margin-bottom: 10px;
 }
 
 .draft-meta {
@@ -1342,6 +1485,7 @@ summary {
   .studio-main,
   .project-dashboard,
   .project-grid,
+  .essential-brief-grid,
   .brief-grid,
   .compact-grid.wide,
   .import-grid,
@@ -1378,6 +1522,7 @@ summary {
   .style-guide-grid,
   .compact-grid,
   .project-actions,
+  .project-backup-actions,
   .project-focus,
   .project-undo,
   .project-list-tools,
@@ -1392,7 +1537,8 @@ summary {
   .version-diff-row,
   .material-form-actions,
   .type-selector,
-  .obsidian-status-grid {
+  .obsidian-status-grid,
+  .ops-check-list {
     grid-template-columns: 1fr;
   }
 

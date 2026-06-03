@@ -62,13 +62,24 @@ function assertFile(filePath, label, magic) {
 }
 
 async function main() {
-  const vault = fs.mkdtempSync(path.join(os.tmpdir(), "bookwrite-api-qa-vault-"));
+  const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), "bookwrite-api-qa-"));
+  const vault = path.join(sandbox, "vault");
+  const dataDir = path.join(sandbox, "data");
+  const outputDir = path.join(sandbox, "output");
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.mkdirSync(vault, { recursive: true });
   fs.mkdirSync(path.join(vault, ".obsidian"));
   fs.mkdirSync(path.join(vault, "Ideas"));
 
   const child = spawn(process.execPath, ["ui/server.js"], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(PORT) },
+    env: {
+      ...process.env,
+      PORT: String(PORT),
+      BOOKWRITE_DATA_DIR: dataDir,
+      BOOKWRITE_OUTPUT_DIR: outputDir,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -176,7 +187,7 @@ async function main() {
     await assertDownload(pdf.downloadUrl);
   } finally {
     child.kill("SIGTERM");
-    fs.rmSync(vault, { recursive: true, force: true });
+    fs.rmSync(sandbox, { recursive: true, force: true });
   }
 
   console.log("API quality test passed: Obsidian save, versions, review, polish, DOCX, and PDF flows work.");

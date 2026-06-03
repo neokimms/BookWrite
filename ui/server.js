@@ -9,6 +9,8 @@ loadEnvFile(path.join(ROOT, ".env"));
 const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 4173);
 const PYTHON = process.env.PYTHON || "python3";
+const DATA_DIR = process.env.BOOKWRITE_DATA_DIR ? path.resolve(process.env.BOOKWRITE_DATA_DIR) : path.join(ROOT, "data");
+const OUTPUT_DIR = process.env.BOOKWRITE_OUTPUT_DIR ? path.resolve(process.env.BOOKWRITE_OUTPUT_DIR) : path.join(ROOT, "output");
 const AZURE_OPENAI_ENDPOINT = (process.env.AZURE_OPENAI_ENDPOINT || "").replace(/\/+$/, "");
 const AZURE_OPENAI_DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT || "";
 const AZURE_OPENAI_API_KEY = process.env.AZURE_OPENAI_API_KEY || process.env.OPENAI_API_KEY || process.env.LLM_API_KEY || "";
@@ -19,10 +21,10 @@ const LLM_MODEL = process.env.LLM_MODEL || process.env.OPENAI_MODEL || AZURE_OPE
 const OBSIDIAN_APP_PATHS = ["/Applications/Obsidian.app", path.join(process.env.HOME || "", "Applications", "Obsidian.app")];
 const OBSIDIAN_APP_CONFIG = path.join(process.env.HOME || "", "Library", "Application Support", "obsidian", "obsidian.json");
 
-const DEFAULT_CSV = path.join(ROOT, "data", "weekly_terms.csv");
-const OBSIDIAN_CSV = path.join(ROOT, "data", "weekly_terms.from_obsidian.csv");
-const PROMPT_OUT = path.join(ROOT, "output", "book-draft-prompt.md");
-const RUN_STATE = path.join(ROOT, "output", "last-run.json");
+const DEFAULT_CSV = path.join(DATA_DIR, "weekly_terms.csv");
+const OBSIDIAN_CSV = path.join(DATA_DIR, "weekly_terms.from_obsidian.csv");
+const PROMPT_OUT = path.join(OUTPUT_DIR, "book-draft-prompt.md");
+const RUN_STATE = path.join(OUTPUT_DIR, "last-run.json");
 const CSV_FIELDS = [
   "registered_at",
   "type",
@@ -122,10 +124,12 @@ async function readJson(request) {
 }
 
 function childEnv() {
-  const moduleCache = path.join(ROOT, "output", ".clang-module-cache");
+  const moduleCache = path.join(OUTPUT_DIR, ".clang-module-cache");
   fs.mkdirSync(moduleCache, { recursive: true });
   return {
     ...process.env,
+    BOOKWRITE_DATA_DIR: DATA_DIR,
+    BOOKWRITE_OUTPUT_DIR: OUTPUT_DIR,
     CLANG_MODULE_CACHE_PATH: moduleCache,
   };
 }
@@ -1025,44 +1029,77 @@ function ensureOutputFile(filePath, label) {
   }
 }
 
+function commandStatus(command) {
+  const value = String(command || "").trim();
+  if (!value) {
+    return { command: value, ready: false, detail: "명령이 설정되지 않았습니다." };
+  }
+  if (value.includes(path.sep)) {
+    return {
+      command: value,
+      ready: fs.existsSync(value),
+      detail: fs.existsSync(value) ? value : `${value} 파일을 찾지 못했습니다.`,
+    };
+  }
+
+  const found = String(process.env.PATH || "")
+    .split(path.delimiter)
+    .map((dir) => path.join(dir, value))
+    .find((candidate) => fs.existsSync(candidate));
+  return {
+    command: value,
+    ready: Boolean(found),
+    detail: found || `${value} 명령을 PATH에서 찾지 못했습니다.`,
+  };
+}
+
 function exportTemplateInfo(template) {
   const templates = {
     manuscript: {
       id: "manuscript",
       label: "출판 원고형",
       css: [
-        "body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; line-height: 1.72; color: #1f2a2d; max-width: 760px; margin: 42px auto; padding: 0 28px; }",
-        "h1 { font-size: 28px; margin: 0 0 24px; }",
-        "h2 { font-size: 20px; margin: 30px 0 12px; }",
-        "h3 { font-size: 16px; margin: 24px 0 10px; }",
+        "@page { margin: 22mm 20mm 24mm; }",
+        "body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; line-height: 1.72; color: #1f2a2d; max-width: 760px; margin: 42px auto; padding: 0 28px; word-break: keep-all; }",
+        "h1 { font-size: 28px; line-height: 1.28; margin: 0 0 24px; break-after: avoid; }",
+        "h2 { font-size: 20px; line-height: 1.36; margin: 32px 0 12px; break-after: avoid; }",
+        "h3 { font-size: 16px; line-height: 1.4; margin: 24px 0 10px; break-after: avoid; }",
         "p, li { font-size: 13.5px; }",
-        "ul { padding-left: 22px; }",
-        "body > h1:first-child { break-after: avoid; border-bottom: 1px solid #d8dfda; padding-bottom: 18px; }",
+        "p { margin: 0 0 12px; }",
+        "ul { padding-left: 22px; margin: 8px 0 16px; }",
+        "li { margin: 0 0 5px; }",
+        "body > h1:first-child { border-bottom: 1px solid #d8dfda; padding-bottom: 18px; }",
       ],
     },
     essay: {
       id: "essay",
       label: "에세이형 여백",
       css: [
-        "body { font-family: Georgia, 'Apple SD Gothic Neo', 'Noto Serif KR', serif; line-height: 1.86; color: #20282b; max-width: 690px; margin: 58px auto; padding: 0 36px; }",
-        "h1 { font-size: 30px; margin: 0 0 30px; font-weight: 700; }",
-        "h2 { font-size: 21px; margin: 36px 0 14px; }",
-        "h3 { font-size: 17px; margin: 28px 0 12px; }",
+        "@page { margin: 24mm 22mm 26mm; }",
+        "body { font-family: Georgia, 'Apple SD Gothic Neo', 'Noto Serif KR', serif; line-height: 1.86; color: #20282b; max-width: 690px; margin: 58px auto; padding: 0 36px; word-break: keep-all; }",
+        "h1 { font-size: 30px; line-height: 1.28; margin: 0 0 30px; font-weight: 700; break-after: avoid; }",
+        "h2 { font-size: 21px; line-height: 1.38; margin: 38px 0 14px; break-after: avoid; }",
+        "h3 { font-size: 17px; line-height: 1.42; margin: 28px 0 12px; break-after: avoid; }",
         "p, li { font-size: 14.5px; }",
-        "ul { padding-left: 24px; }",
-        "body > h1:first-child { break-after: avoid; border-bottom: 1px solid #d6d0c4; padding-bottom: 20px; }",
+        "p { margin: 0 0 15px; }",
+        "ul { padding-left: 24px; margin: 10px 0 18px; }",
+        "li { margin: 0 0 6px; }",
+        "body > h1:first-child { border-bottom: 1px solid #d6d0c4; padding-bottom: 20px; }",
       ],
     },
     compact: {
       id: "compact",
       label: "검토용 compact",
       css: [
-        "body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; line-height: 1.55; color: #1f2a2d; max-width: 860px; margin: 30px auto; padding: 0 22px; }",
-        "h1 { font-size: 24px; margin: 0 0 18px; }",
-        "h2 { font-size: 18px; margin: 24px 0 10px; }",
-        "h3 { font-size: 15px; margin: 18px 0 8px; }",
+        "@page { margin: 18mm 18mm 20mm; }",
+        "body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif; line-height: 1.55; color: #1f2a2d; max-width: 860px; margin: 30px auto; padding: 0 22px; word-break: keep-all; }",
+        "h1 { font-size: 24px; line-height: 1.26; margin: 0 0 18px; break-after: avoid; }",
+        "h2 { font-size: 18px; line-height: 1.34; margin: 24px 0 10px; break-after: avoid; }",
+        "h3 { font-size: 15px; line-height: 1.38; margin: 18px 0 8px; break-after: avoid; }",
         "p, li { font-size: 12.5px; }",
-        "ul { padding-left: 20px; }",
+        "p { margin: 0 0 9px; }",
+        "ul { padding-left: 20px; margin: 7px 0 12px; }",
+        "li { margin: 0 0 4px; }",
         "body > h1:first-child { border-bottom: 1px solid #d8dfda; padding-bottom: 12px; }",
       ],
     },
@@ -1188,6 +1225,92 @@ async function testLlmSample(payload = {}) {
   return {
     sample,
     llmConnection: llmConnectionStatus(),
+    lastRun,
+  };
+}
+
+function statusCheck(label, status, message, detail = "") {
+  return { label, status, message, detail };
+}
+
+function operationalCheck(payload = {}) {
+  const obsidian = checkObsidianSettings(payload);
+  const entries = entriesForPayload(payload);
+  const llm = llmConnectionStatus();
+  const docxTool = commandStatus(PANDOC);
+  const swiftTool = commandStatus(SWIFT);
+  const cupsTool = commandStatus(CUPSFILTER);
+  const pdfReady = swiftTool.ready || cupsTool.ready;
+  const markdown = String(payload.markdown || "").trim();
+  const sourceMarkdown = markdownWithoutFrontmatter(markdown);
+  const checks = [
+    statusCheck(
+      "Obsidian 연결",
+      obsidian.connected ? "ok" : "error",
+      obsidian.connected ? "Vault 연결됨" : "Vault 확인 필요",
+      obsidian.vaultPath || "Vault 경로 없음",
+    ),
+    statusCheck(
+      "가져오기 폴더",
+      obsidian.importFolderExists ? "ok" : "warn",
+      obsidian.importFolderExists ? "가져오기 가능" : "폴더 확인 필요",
+      obsidian.importFolder || "폴더 미지정",
+    ),
+    statusCheck(
+      "저장 위치",
+      obsidian.savePreview && obsidian.vaultExists ? "ok" : "error",
+      obsidian.savePreview && obsidian.vaultExists ? "저장 경로 준비됨" : "저장 경로 확인 필요",
+      obsidian.savePreview || "저장 위치 없음",
+    ),
+    statusCheck(
+      "LLM",
+      llm.configured ? "ok" : "warn",
+      llm.configured ? `${llm.provider === "azure-openai" ? "Azure OpenAI" : "OpenAI"} 설정됨` : "키 없이 기본 초안으로 동작",
+      `model=${llm.model}, endpoint=${llm.endpoint}`,
+    ),
+    statusCheck(
+      "원고 재료",
+      entries.length ? "ok" : "warn",
+      entries.length ? `${entries.length}개 반영 가능` : "선택 기간의 재료 없음",
+      [payload.weekStart, payload.weekEnd].filter(Boolean).join(" - ") || "기간 미정",
+    ),
+    statusCheck(
+      "원고 초안",
+      characterCount(sourceMarkdown) >= 300 ? "ok" : characterCount(sourceMarkdown) ? "warn" : "error",
+      characterCount(sourceMarkdown) ? `${characterCount(sourceMarkdown)}자 작성됨` : "초안 없음",
+      "PDF/DOCX/Obsidian 저장 전 초안 확인",
+    ),
+    statusCheck(
+      "DOCX",
+      docxTool.ready ? "ok" : "warn",
+      docxTool.ready ? "DOCX 생성 도구 확인됨" : "pandoc 확인 필요",
+      docxTool.detail,
+    ),
+    statusCheck(
+      "PDF",
+      pdfReady ? "ok" : "warn",
+      pdfReady ? "PDF 생성 도구 확인됨" : "PDF 생성 도구 확인 필요",
+      [swiftTool.ready ? swiftTool.detail : "", cupsTool.ready ? cupsTool.detail : ""].filter(Boolean).join(" · ") || `${swiftTool.detail} · ${cupsTool.detail}`,
+    ),
+  ];
+
+  const errorCount = checks.filter((check) => check.status === "error").length;
+  const warnCount = checks.filter((check) => check.status === "warn").length;
+  const lastRun = writeRunState({
+    action: "operational-check",
+    status: errorCount ? "failed" : "success",
+    message: errorCount
+      ? `운영 점검에서 확인 필요 항목 ${errorCount}개가 발견됐습니다.`
+      : warnCount
+        ? `운영 점검 완료: 주의 항목 ${warnCount}개가 있습니다.`
+        : "운영 점검 완료: 주요 흐름이 준비됐습니다.",
+  });
+
+  return {
+    checks,
+    obsidian,
+    llmConnection: llm,
+    entries,
     lastRun,
   };
 }
@@ -1665,7 +1788,7 @@ async function exportManuscriptFile(payload) {
   const template = exportTemplateInfo(payload.exportTemplate);
   const preparedMarkdown = String(payload.preparedMarkdown || "").trim();
   const markdown = preparedMarkdown ? `${preparedMarkdown}\n` : prepareManuscriptMarkdown(sourceMarkdown, payload, title);
-  const exportDir = path.join(ROOT, "output", "exports");
+  const exportDir = path.join(OUTPUT_DIR, "exports");
   fs.mkdirSync(exportDir, { recursive: true });
   const baseName = `${localTimestampForFile()}_${safeFileName(title)}`;
   const mdPath = path.join(exportDir, `${baseName}.md`);
@@ -2279,7 +2402,7 @@ function getStatus(projectId = "default") {
 
 function serveExportFile(request, requestUrl, response) {
   const requestedPath = requestUrl.searchParams.get("path") || "";
-  const exportRoot = path.join(ROOT, "output", "exports");
+  const exportRoot = path.join(OUTPUT_DIR, "exports");
   const filePath = path.resolve(requestedPath);
   const insideExportRoot = filePath === exportRoot || filePath.startsWith(`${exportRoot}${path.sep}`);
   if (!insideExportRoot || !fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
@@ -2364,6 +2487,18 @@ async function handleApi(request, response) {
         ...getStatus(payload.projectId),
         ...result,
         entries: entriesForRange(payload.weekStart || "", payload.weekEnd || "", payload.projectId),
+      });
+      return;
+    }
+
+    if (request.method === "POST" && requestUrl.pathname === "/api/operational-check") {
+      const payload = await readJson(request);
+      const result = operationalCheck(payload);
+      sendJson(response, 200, {
+        ok: true,
+        ...getStatus(payload.projectId),
+        ...result,
+        entries: result.entries,
       });
       return;
     }
