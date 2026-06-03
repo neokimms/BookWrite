@@ -190,6 +190,7 @@ let projectSortMode = "updated-desc";
 let lastRetryAction = null;
 let statusErrorShown = false;
 let detectedVaultPath = "";
+let chapterSavedToObsidian = false;
 
 const writingExample = {
   type: "case",
@@ -308,8 +309,25 @@ function showView(viewName) {
   }
 }
 
+function dateRangeReady() {
+  return Boolean(weekStartInput.value && weekEndInput.value && weekEndInput.value >= weekStartInput.value);
+}
+
 function briefReady() {
-  return Boolean(chapterTitleInput.value.trim() && weekStartInput.value && weekEndInput.value);
+  return Boolean(chapterTitleInput.value.trim() && dateRangeReady());
+}
+
+function briefStatusMessage() {
+  if (!chapterTitleInput.value.trim()) {
+    return "챕터 제목과 기간만 먼저 입력해도 시작할 수 있습니다.";
+  }
+  if (!weekStartInput.value || !weekEndInput.value) {
+    return "시작일과 종료일을 모두 입력해 주세요.";
+  }
+  if (!dateRangeReady()) {
+    return "종료일은 시작일과 같거나 이후여야 합니다.";
+  }
+  return "필수 브리프가 준비됐습니다. 필요하면 심화 설정을 조정하세요.";
 }
 
 function draftReady() {
@@ -345,14 +363,13 @@ function updateWritingFlowState() {
   const hasBrief = briefReady();
   const hasMaterials = selectedEntryCount() > 0;
   const hasDraft = draftReady();
+  const hasSavedChapter = hasDraft && chapterSavedToObsidian;
 
   updateWorkflowStep("brief", hasBrief ? "complete" : "active");
   updateWorkflowStep("materials", hasMaterials ? "complete" : hasBrief ? "active" : "");
-  updateWorkflowStep("draft", hasDraft ? "active" : hasMaterials ? "active" : "");
+  updateWorkflowStep("draft", hasSavedChapter ? "complete" : hasDraft || hasMaterials ? "active" : "");
 
-  briefRequiredState.textContent = hasBrief
-    ? "필수 브리프가 준비됐습니다. 필요하면 심화 설정을 조정하세요."
-    : "챕터 제목과 기간만 먼저 입력해도 시작할 수 있습니다.";
+  briefRequiredState.textContent = briefStatusMessage();
   entryRangeLabel.textContent = `적용 기간: ${formatDateRange()}`;
   const selectedCount = selectedEntryCount();
   entryCount.textContent = currentEntries.length
@@ -1477,12 +1494,14 @@ async function restoreDraftVersion() {
   }
 
   draftPreview.value = version.markdown;
+  chapterSavedToObsidian = false;
   setDraftState("버전 복원됨");
   draftMeta.textContent = `${characterCount(version.markdown)}자 · ${formatVersionLabel(version)}에서 복원`;
   setReviewState("다시 점검 필요");
   versionDiff.hidden = true;
   versionDiff.innerHTML = "";
   renderDraftVersions();
+  updateWritingFlowState();
   writeLog("선택한 원고 버전을 편집창으로 복원했습니다.");
 }
 
@@ -2173,6 +2192,7 @@ function renderEntries(entries) {
 function renderDraft(data) {
   const markdown = data.markdown || "";
   draftPreview.value = markdown;
+  chapterSavedToObsidian = false;
   if (!markdown.trim()) {
     setDraftState("대기 중");
     draftMeta.textContent = "아직 생성된 원고가 없습니다.";
@@ -2394,6 +2414,7 @@ function handleSavedDraftAction(event) {
 
 function updateDraftEditState() {
   const text = draftPreview.value.trim();
+  chapterSavedToObsidian = false;
   if (!text) {
     setDraftState("대기 중");
     draftMeta.textContent = "아직 생성된 원고가 없습니다.";
@@ -2743,6 +2764,9 @@ async function exportChapter() {
     const data = await requestJson("/api/export-chapter", editedDraftPayload());
     renderStatus(data);
     await saveDraftVersion("Obsidian 저장", { silent: true });
+    chapterSavedToObsidian = true;
+    setDraftState("Obsidian 저장됨");
+    updateWritingFlowState();
     writeLog(data.lastRun?.message || `저장했습니다: ${data.filePath}`);
     clearRetryAction();
   } catch (error) {

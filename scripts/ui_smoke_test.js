@@ -42,6 +42,7 @@ async function jsonFetch(url, options = {}) {
 
 async function main() {
   const html = fs.readFileSync(path.join(ROOT, "ui", "public", "index.html"), "utf8");
+  const appJs = fs.readFileSync(path.join(ROOT, "ui", "public", "app.js"), "utf8");
   for (const marker of [
     "data-view-tab=\"projects\"",
     "id=\"projectSearch\"",
@@ -70,6 +71,15 @@ async function main() {
     "id=\"retryLastButton\"",
   ]) {
     assertIncludes(html, marker);
+  }
+  for (const marker of [
+    "function dateRangeReady()",
+    "weekEndInput.value >= weekStartInput.value",
+    "chapterSavedToObsidian = true",
+    "updateWorkflowStep(\"draft\", hasSavedChapter ? \"complete\"",
+    "종료일은 시작일과 같거나 이후여야 합니다.",
+  ]) {
+    assertIncludes(appJs, marker);
   }
 
   const child = spawn(process.execPath, ["ui/server.js"], {
